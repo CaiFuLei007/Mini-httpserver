@@ -1,7 +1,8 @@
 
 // #include "buffer_test.hpp"
 // #include "socket_test.hpp"
-// test files are compiled as separate translation units
+// #include "poller_test.hpp"
+#include "timerwheel_test.hpp"
 
 #include <gtest/gtest.h>
 

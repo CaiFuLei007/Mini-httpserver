@@ -1,0 +1,36 @@
+
+#include "tcp_server/acceptor.h"
+#include "base/channel.h"
+#include "util/quill_log.h"
+
+
+void Acceptor::AcceptReadCallback()
+{
+    int fd = socket_.Accept();
+    if(fd < 0)
+    {
+        QLOG_ERROR("SOCKET ACCEPT FAIL");
+        return ;
+    }
+
+    if(new_connect_cb_)
+    {
+        new_connect_cb_(fd);
+        return ;
+    }
+}
+
+
+Acceptor::Acceptor(uint16_t port)
+:socket_() , 
+channel_()
+{
+    socket_.CreateServer(port);
+    channel_ = std::make_shared<Channel>(socket_.Fd());
+    channel_->SetReadCallback(std::bind(&Acceptor::AcceptReadCallback , this));
+}
+
+void Acceptor::Listen()
+{
+    channel_->ReadAble();
+}

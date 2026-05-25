@@ -44,6 +44,11 @@ public:
         close(fd_);
     }
 
+    int Fd()
+    {
+        return fd_;
+    }
+
     int GetEvents()
     {
         return events_;
