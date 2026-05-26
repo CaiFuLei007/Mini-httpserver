@@ -1,7 +1,8 @@
 
 #include "tcp_server/acceptor.h"
+#include "tcp_server/eventloop.h"
 #include "base/channel.h"
-#include "util/quill_log.h"
+#include "base/util/quill_log.h"
 
 
 void Acceptor::AcceptReadCallback()
@@ -21,12 +22,13 @@ void Acceptor::AcceptReadCallback()
 }
 
 
-Acceptor::Acceptor(uint16_t port)
+Acceptor::Acceptor(uint16_t port, std::shared_ptr<EventLoop> eventloop)
 :socket_() , 
-channel_()
+channel_() ,
+eventloop_(eventloop)
 {
     socket_.CreateServer(port);
-    channel_ = std::make_shared<Channel>(socket_.Fd());
+    channel_ = std::make_shared<Channel>(socket_.Fd() , eventloop_.lock());
     channel_->SetReadCallback(std::bind(&Acceptor::AcceptReadCallback , this));
 }
 

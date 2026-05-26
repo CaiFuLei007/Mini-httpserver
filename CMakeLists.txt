@@ -35,8 +35,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1")
 
 file(GLOB SRC_LISTS 
     "src/*.cc"
-    "src/util/*.cc"
     "src/base/*.cc"
+    "src/base/util/*.cc"
     "src/tcp_server/*.cc"
     "Test/*.cc"
 )

@@ -41,3 +41,17 @@ int Poller::RemvoeEvent(std::shared_ptr<Channel> channel)
     channels_.erase(fd);
     return epoll_ctl(epollfd_ , EPOLL_CTL_DEL , fd , nullptr);
 }
+
+
+std::vector<std::shared_ptr<Channel> > Poller::EpollWait()
+{
+    struct epoll_event events[1024];
+    int nfds = epoll_wait(epollfd_, events, 1024, -1);
+
+    std::vector<std::shared_ptr<Channel> > ret(nfds);
+    for (int i = 0; i < nfds; ++i) {
+        ret[i] = channels_[events[i].data.fd];
+        ret[i]->SetRevents(events[i].events);
+    }
+    return ret;
+}

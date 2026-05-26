@@ -36,6 +36,8 @@
 #include <memory>
 #include <unordered_map>
 
+
+
 class TimeTask
 {
     using Task = std::function<void()>;
@@ -45,6 +47,7 @@ private:
     Task task_;
     bool is_cancel_;
 
+    
 public:
     TimeTask(size_t id  ,size_t timeout , Task task)
     :id_(id) , 
@@ -75,6 +78,7 @@ public:
     }
 };
 
+class EventLoop;
 
 class TimerWheel
 {
@@ -84,16 +88,18 @@ private:
     size_t tick_;
     std::unordered_map<size_t , std::weak_ptr<TimeTask> > tasks_;
     int timerfd_;
-    std::unique_ptr<Channel> channel_;
 
-private:
+    std::weak_ptr<EventLoop> eventloop_;
+    std::shared_ptr<Channel> channel_;
+
+    private:
     int CreateTimerFd();
 
     void HandleAllTask(size_t index);
 
     void TimerFdReadCallback();
 public:
-    TimerWheel();
+    TimerWheel(std::shared_ptr<EventLoop> eventloop);
 
     void SetTask(size_t id ,size_t timeout , Task task);
     void UpdateTask(size_t id);

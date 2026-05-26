@@ -21,7 +21,7 @@
 #include <functional>
 
 class Channel;
-
+class EventLoop;
 
 class Acceptor
 {
@@ -32,11 +32,13 @@ private:
     std::shared_ptr<Channel> channel_;
     NewConnectCallback new_connect_cb_;
 
+    std::weak_ptr<EventLoop> eventloop_;
+
 private:
     void AcceptReadCallback();
 
 public:
-    Acceptor(uint16_t port);
+    Acceptor(uint16_t port, std::shared_ptr<EventLoop> eventloop);
 
     void SetNewConnectCallback(NewConnectCallback cb)
     {

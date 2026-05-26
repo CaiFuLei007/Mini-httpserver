@@ -17,6 +17,7 @@
 #include <cstring>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 class Channel;
 class PollerTest;
@@ -50,4 +51,6 @@ public:
 
     int UpdateEvent(std::shared_ptr<Channel> channel);
     int RemvoeEvent(std::shared_ptr<Channel> channel);
+
+    std::vector<std::shared_ptr<Channel> > EpollWait();  // 返回所有就绪事件
 };

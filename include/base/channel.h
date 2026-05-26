@@ -19,8 +19,12 @@
 #include <iostream>
 #include <functional>
 #include <unistd.h>
+#include <memory>
 
-class Channel
+class EventLoop;
+
+
+class Channel : public std::enable_shared_from_this<Channel>
 {
     using Callback = std::function<void()>;
 private:
@@ -32,11 +36,18 @@ private:
     Callback error_callback_;
     Callback event_callback_;
 
+    std::weak_ptr<EventLoop> eventloop_;
+
+private:
+    void Update();
+    void Remove();
+
 public:
-    Channel(int fd)
+    Channel(int fd , std::shared_ptr<EventLoop> eventloop)
     :fd_(fd) , 
     events_(0) ,
-    revents_(0)
+    revents_(0) , 
+    eventloop_(eventloop)
     {}
 
     ~Channel()
@@ -95,4 +106,6 @@ public:
     void WriteAble();
     void UnReadAble();
     void UnWriteAble();
+
+    void RemoveAllEvent();
 };

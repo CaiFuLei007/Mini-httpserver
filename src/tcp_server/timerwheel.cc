@@ -1,6 +1,6 @@
 
 #include "tcp_server/timerwheel.h"
-#include "util/quill_log.h"
+#include "base/util/quill_log.h"
 #include "base/channel.h"
 
 #include <signal.h>
@@ -36,11 +36,12 @@ void TimerWheel::TimerFdReadCallback()
     }
 }
 
-TimerWheel::TimerWheel()
+TimerWheel::TimerWheel(std::shared_ptr<EventLoop> eventloop)
 :tick_(0) ,
 wheel_(60) ,
 timerfd_(CreateTimerFd()) ,
-channel_(std::make_unique<Channel>(timerfd_))
+eventloop_(eventloop) , 
+channel_(std::make_shared<Channel>(timerfd_ , eventloop))
 {
     channel_->SetReadCallback(std::bind(&TimerWheel::TimerFdReadCallback , this));
 }
