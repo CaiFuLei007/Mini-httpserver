@@ -45,10 +45,10 @@ add_executable(all_test
     Test/all_test.cc
     ${SRC_LISTS}
 )
-add_executable(echo_server
-    Test/echo_server.cc
-    ${SRC_LISTS}
-)
+# add_executable(echo_server
+#     Test/echo_server.cc
+#     ${SRC_LISTS}
+# )
 
 # =================================================================
 #                         添加依赖
