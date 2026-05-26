@@ -1,6 +1,6 @@
 
-#include "tcp_server/acceptor.h"
-#include "tcp_server/eventloop.h"
+#include "server/acceptor.h"
+#include "server/eventloop.h"
 #include "base/channel.h"
 #include "base/util/quill_log.h"
 

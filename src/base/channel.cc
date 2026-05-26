@@ -1,6 +1,6 @@
   
 #include "base/channel.h"
-#include "tcp_server/eventloop.h"
+#include "server/eventloop.h"
 
 #include <sys/epoll.h>
   
@@ -22,6 +22,12 @@ void Channel::Handle()
     {
         if(error_callback_)
             error_callback_();
+    }
+
+    if(events_ & EPOLLRDHUP)
+    {
+        if(close_callback_)
+            close_callback_();
     }
 
     if(event_callback_)

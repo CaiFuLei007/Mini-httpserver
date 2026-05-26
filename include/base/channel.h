@@ -34,6 +34,7 @@ private:
     Callback read_callback_;
     Callback write_callback_;
     Callback error_callback_;
+    Callback close_callback_;
     Callback event_callback_;
 
     std::weak_ptr<EventLoop> eventloop_;
@@ -98,6 +99,11 @@ public:
     void SetEventCallback(Callback cb)
     {
         event_callback_ = cb;
+    }
+
+    void SetCloseCallback(Callback cb)
+    {
+        close_callback_ = cb;
     }
 
     void Handle();   // 处理就绪事件

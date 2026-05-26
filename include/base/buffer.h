@@ -72,6 +72,12 @@ public:
         write_index_ += n;
     }
 
+    void Clear()
+    {
+        buffer_.clear();
+        read_index_ = write_index_ = 0;
+    }
+
     size_t Read(char* buf , size_t size);
     size_t Read(std::string &buf);
     size_t ReadAndPop(char* buf , size_t size);
