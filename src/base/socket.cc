@@ -63,8 +63,9 @@ bool Socket::Connect(uint16_t port , const std::string &ip)
 size_t Socket::Recv(std::string& buf)
 {   
     char tmp[1024]{0};
+    memset(&tmp, 0, sizeof(tmp));
     ssize_t ret = recv(socketfd_ , tmp , sizeof(buf) / sizeof(char) , 0);
-    buf = tmp;
+    buf = std::string(&tmp[0] , &tmp[0] + ret);
     
     return ret;
 }
@@ -94,6 +95,8 @@ bool Socket::CreateServer(uint16_t port ,  const std::string& ip)
         QLOG_ERROR("SOCKET FD CREATE FAIL");
         return false;
     }
+    ReusePort();
+    ReuseAddr();
 
     if(!Bind(port , ip))
     {
@@ -109,11 +112,23 @@ bool Socket::CreateServer(uint16_t port ,  const std::string& ip)
     return true;
 }
 
+void Socket::ReusePort()
+{
+    int opt = 1;
+    setsockopt(socketfd_, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+}
+void Socket::ReuseAddr()
+{
+    int opt = 1;
+    setsockopt(socketfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+}
+
 size_t Socket::RecvNoBlock(std::string& buf)
 {
     char tmp[1024]{0};
-    ssize_t ret = recv(socketfd_ , tmp , sizeof(tmp) / sizeof(char) , MSG_DONTWAIT);
-    buf = tmp;
+    memset(&tmp, 0, sizeof(tmp));
+    ssize_t ret = recv(socketfd_ , tmp , sizeof(buf) / sizeof(char) , MSG_DONTWAIT);
+    buf = std::string(&tmp[0] , &tmp[0] + ret);
     return ret;
 }
 

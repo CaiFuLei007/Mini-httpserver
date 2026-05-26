@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <string>
+#include <unistd.h>
 
 class Socket
 {
@@ -34,6 +35,11 @@ public:
     :socketfd_(fd)
     {}
 
+    ~Socket()
+    {
+        close(socketfd_);
+    }
+
     int Fd()
     {
         return socketfd_;
@@ -51,4 +57,7 @@ public:
 
     bool CreateServer(uint16_t port ,  const std::string& ip = "0.0.0.0");
     bool CreateClient(uint16_t port , const std::string &ip);
+
+    void ReusePort();
+    void ReuseAddr();
 };

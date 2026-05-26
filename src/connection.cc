@@ -2,6 +2,7 @@
 #include "connection.h"
 #include "base/channel.h"
 #include "server/eventloop.h"
+#include "base/util/quill_log.h"
 
 
 void Connection::ReleaseInLoop()
@@ -32,18 +33,23 @@ void Connection::ConnReadCallback()
 
     std::string buf;
     int ret = socket_.RecvNoBlock(buf);
-    if(ret < 0)
+    if(ret <= 0)
     {
-        if(errno == EAGAIN || errno == EINTR)
+        if(ret < 0 && (errno == EAGAIN || errno == EINTR))
         {
             return ;
         }
         // 出现了错误
         // 读取缓冲区中如果有数据就进行处理 , 然后发送 , 最后关闭连接
+        status_ = ConnectionStatus::DISCONNECTING;
         if(in_buffer_->Size() > 0)
         {
             read_callback_(shared_from_this() , in_buffer_);
             channel_->WriteAble();
+        }
+        else
+        {
+            Release();
         }
         return ;
     }
@@ -62,17 +68,21 @@ void Connection::ConnWriteCallback()
     // 1. 将数据从缓冲区中发送出去
     std::string buf;
     out_buffer_->ReadAndPop(buf);
-    int ret = socket_.Send(buf);
+    int ret = socket_.SendNoBlock(buf);
     if(ret < 0)
     {
         if(errno == EAGAIN || errno == EINTR)
         {
             return ;
         }
+        status_ = ConnectionStatus::DISCONNECTING;
         // 将发送缓冲区清空 , 调用 release 销毁连接
         out_buffer_->Clear();
-        Release();
         return ;
+    }
+    if(status_ == ConnectionStatus::DISCONNECTING)
+    {
+        Release();
     }
     if(out_buffer_->Size() == 0)
     {
@@ -98,6 +108,8 @@ void Connection::ConnEventCallback()
 
 void Connection::Release()
 {
+    status_ = ConnectionStatus::DISCONNECTED;
+    QLOG_INFO("CONNECT : {} BE RELAEASE" , conn_id_);
     eventloop_->PutIntoQueue(std::bind(&Connection::ReleaseInLoop , this));
 }
 
@@ -107,6 +119,7 @@ void Connection::SendMessageInLoop(const std::string& message)
     out_buffer_->WriteAndPush(message);
     channel_->WriteAble();
 }
+
 Connection::Connection(uint64_t conn_id , std::shared_ptr<EventLoop> eventloop , int fd)
 :conn_id_(conn_id) , 
 eventloop_(eventloop) , 
@@ -115,8 +128,10 @@ in_buffer_(std::make_shared<Buffer>()) ,
 out_buffer_(std::make_shared<Buffer>()) , 
 socket_(fd) , 
 is_selfrelease_(false) , 
-timeout_(0)
+timeout_(0) , 
+status_(ConnectionStatus::CONNECTING)
 {
+    QLOG_INFO("NEW CONNECTION : {} , THE EVENTLOOP IS : {}" , conn_id_, (void*)eventloop_.get());
     channel_->SetReadCallback(std::bind(&Connection::ConnReadCallback , this));
     channel_->SetWriteCallback(std::bind(&Connection::ConnWriteCallback , this));
     channel_->SetCloseCallback(std::bind(&Connection::ConnCloseCallback , this));
@@ -131,11 +146,18 @@ void Connection::SendMessage(const std::string& message)
     return;
 }
 
-void Connection::Ready()
+
+void Connection::ReadyInLoop()
 {
+    status_ = ConnectionStatus::CONNECTED;
     if(is_selfrelease_)
     {
         eventloop_->AddTimedJob(conn_id_ , timeout_ , std::bind(&Connection::Release , this));
     }
     channel_->ReadAble();
+}
+
+void Connection::Ready()
+{
+    eventloop_->RunInLoop(std::bind(&Connection::ReadyInLoop , this));
 }

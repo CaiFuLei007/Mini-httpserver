@@ -7,6 +7,7 @@
 void Buffer::CheckCapcity(size_t additional_space)
 {
     size_t end_empty_space = EndEmptySpace() , front_empty_space = FrontEmptySpace();
+    size_t sz = Size();
     if(end_empty_space >= additional_space)
     {
         return;
@@ -15,6 +16,7 @@ void Buffer::CheckCapcity(size_t additional_space)
     {
         // 将数据整体向前移动
         std::copy(buffer_.begin() + read_index_ , buffer_.begin() + write_index_ , buffer_.begin());
+        read_index_ = 0 , write_index_ = sz;
         return ;
     }
 

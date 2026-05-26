@@ -37,15 +37,18 @@ file(GLOB SRC_LISTS
     "src/*.cc"
     "src/base/*.cc"
     "src/base/util/*.cc"
-    "src/tcp_server/*.cc"
-    "Test/*.cc"
+    "src/server/*.cc"
+    "Test/*.hpp"
 )
 
 add_executable(all_test
     Test/all_test.cc
     ${SRC_LISTS}
 )
-
+add_executable(echo_server
+    Test/echo_server.cc
+    ${SRC_LISTS}
+)
 
 # =================================================================
 #                         添加依赖

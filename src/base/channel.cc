@@ -6,25 +6,25 @@
   
 void Channel::Handle()
 {
-    if(events_ & EPOLLIN)
+    if(revents_ & EPOLLIN)
     {
         if(read_callback_)
             read_callback_();
     }
 
-    if(events_ & EPOLLOUT)
+    if(revents_ & EPOLLOUT)
     {
         if(write_callback_)
             write_callback_();
     }
 
-    if(events_ & EPOLLHUP || events_ & EPOLLERR)
+    if(revents_ & EPOLLHUP || revents_ & EPOLLERR)
     {
         if(error_callback_)
             error_callback_();
     }
 
-    if(events_ & EPOLLRDHUP)
+    if(revents_ & EPOLLRDHUP)
     {
         if(close_callback_)
             close_callback_();

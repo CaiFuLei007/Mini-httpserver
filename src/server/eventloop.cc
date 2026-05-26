@@ -54,7 +54,7 @@ void EventLoop::EventFdReadCallback()
     return;
 }
 
-void EventLoop::NotifyThreadInLoop()
+void EventLoop::NotifyThread()
 {
     uint64_t u = 1;
     ssize_t ret = write(eventfd_ , &u , sizeof(u));
@@ -65,13 +65,6 @@ void EventLoop::NotifyThreadInLoop()
     }
     return ;
 }
-
-void EventLoop::NotifyThread()
-{
-    RunInLoop(std::bind(&EventLoop::NotifyThreadInLoop , this ));
-    return ;
-}
-
 
 bool EventLoop::AddTimedJobInLoop(size_t id , size_t timeout , Task task)
 {
@@ -127,9 +120,11 @@ void EventLoop::RunInLoop(Task task)
 
 void EventLoop::PutIntoQueue(Task task)
 {
-    tasks_.push_back(task);
-}
+    std::unique_lock<std::mutex> lock(mutex_);
 
+    tasks_.push_back(task);
+    NotifyThread();
+}
 
 void EventLoop::UpdateEventInLoop(std::shared_ptr<Channel> channel)
 {
@@ -155,15 +150,22 @@ void EventLoop::RemvoeEvent(std::shared_ptr<Channel> channel)
 
 void EventLoop::HanleTask()
 {
-    std::vector<std::shared_ptr<Channel> > ready_event = poller_.EpollWait();
-    for(auto& channel : ready_event)
+    timerwheel_->Ready();
+    channel_->ReadAble();
+    while(1)
     {
-        channel->Handle();
-        channel->SetRevents(0);
+        std::vector<std::shared_ptr<Channel> > ready_event = poller_.EpollWait();
+        for(auto& channel : ready_event)
+        {
+            channel->Handle();
+            channel->SetRevents(0);
+        }
+
+        std::unique_lock<std::mutex> lock(mutex_);
+        for(auto &task : tasks_)
+        {
+            task();
+        }
+        tasks_.clear();
     }
-    for(auto &task : tasks_)
-    {
-        task();
-    }
-    tasks_.clear();
 }

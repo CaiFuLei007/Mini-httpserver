@@ -62,12 +62,18 @@ private:
     size_t next_num_;
 public:
     LoopThreadPoll()
-    :count_(0)
+    :count_(0) , 
+    next_num_(0)
     {}
 
     void SetCount(size_t count)
     {
         count_ = count;
+    }
+
+    size_t Size()
+    {
+        return count_;
     }
 
     std::shared_ptr<EventLoop> NextEventLoop();

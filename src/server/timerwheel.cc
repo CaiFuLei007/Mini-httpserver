@@ -32,7 +32,7 @@ void TimerWheel::TimerFdReadCallback()
     for(int i = 0 ; i < expirations ; i++)
     {
         tick_ = tick_ % wheel_.size();
-        HandleAllTask(tick_);
+        HandleAllTask(tick_++);
     }
 }
 

@@ -15,6 +15,7 @@ std::shared_ptr<EventLoop> LoopThread::GetEventLoop()
 void LoopThread::ThreadCallback()
 {
     eventloop_ = std::make_shared<EventLoop>();
+    eventloop_->Init();
     cond_.notify_all();
     eventloop_->HanleTask();
 }
@@ -30,7 +31,7 @@ void LoopThread::Run()
 std::shared_ptr<EventLoop> LoopThreadPoll::NextEventLoop()
 {
     next_num_ %= eventloops_.size();
-    return eventloops_[next_num_];
+    return eventloops_[next_num_++];
 }
 void LoopThreadPoll::Run()
 {

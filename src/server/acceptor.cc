@@ -24,7 +24,6 @@ void Acceptor::AcceptReadCallback()
 
 Acceptor::Acceptor(uint16_t port, std::shared_ptr<EventLoop> eventloop)
 :socket_() , 
-channel_() ,
 eventloop_(eventloop)
 {
     socket_.CreateServer(port);

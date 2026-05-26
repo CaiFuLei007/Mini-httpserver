@@ -50,8 +50,6 @@ private:
         bool UpdateTimedJobInLoop(size_t id);
         bool CancelTimedJobInLoop(size_t id);
 
-        void NotifyThreadInLoop();
-
         void UpdateEventInLoop(std::shared_ptr<Channel> channel);
         void RemvoeEventInLoop(std::shared_ptr<Channel> channel);
 public:

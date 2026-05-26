@@ -29,6 +29,15 @@
 class Channel;
 class EventLoop;
 
+enum class ConnectionStatus
+{
+    CONNECTING, 
+    CONNECTED , 
+    DISCONNECTING , 
+    DISCONNECTED
+};
+
+
 class Connection : public std::enable_shared_from_this<Connection>
 {
     using ReadCallback = std::function<void(std::shared_ptr<Connection> , std::shared_ptr<Buffer> buf)>;
@@ -56,6 +65,7 @@ private:
     bool is_selfrelease_;
     uint16_t timeout_;
 
+    enum ConnectionStatus status_;
 private:
     void ReleaseInLoop();
 
@@ -66,9 +76,17 @@ private:
     void ConnEventCallback();
 
     void SendMessageInLoop(const std::string& message);
+
+    void ReadyInLoop();
 public:
     Connection(uint64_t conn_id , std::shared_ptr<EventLoop> eventloop , int fd);
+
     void SendMessage(const std::string& message);
+
+    int Id()
+    {
+        return conn_id_;
+    }
 
     void SetReadCallback(ReadCallback cb)
     {   
