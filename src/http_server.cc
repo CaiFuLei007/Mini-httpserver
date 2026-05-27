@@ -72,12 +72,12 @@ bool HttpServer::IsFileRequest(std::shared_ptr<HttpRequest> request)
         return false;
     }
 
-    std::string path = base_dir_ + request->GetPath();
-    if(!FileUtil::IsValidPath(path))
+    if(!FileUtil::IsValidPath(request->GetPath()))
     {
         return false;
     }
 
+    std::string path = base_dir_ + request->GetPath();
     if(path.back() == '/')
         path += "index.html";
 
