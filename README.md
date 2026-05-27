@@ -26,9 +26,15 @@ cd Mini-httpserver
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
-./bin/release/echo_server       # Echo 服务（端口 8888）
-./bin/release/http_server_test  # HTTP 服务（端口 8080）
-./bin/release/all_test          # 单元测试
+
+# Echo 服务（端口 8888）
+./bin/release/echo_server
+
+# HTTP 服务（端口 8080），第二个参数指定静态文件目录
+./bin/release/http_server_test ../web
+
+# 单元测试
+./bin/release/all_test
 ```
 
 ## 代码统计
@@ -66,9 +72,9 @@ cmake ..
 make -j$(nproc)
 
 # 运行示例（从 build 目录）
-./bin/release/echo_server         # Echo 服务，端口 8888
-./bin/release/http_server_test    # HTTP 服务，端口 8080
-./bin/release/all_test            # 单元测试
+./bin/release/echo_server              # Echo 服务，端口 8888
+./bin/release/http_server_test ../web  # HTTP 服务，端口 8080
+./bin/release/all_test                 # 单元测试
 ```
 
 编译依赖：
@@ -133,7 +139,7 @@ telnet localhost 8888
 `Test/http_server_test.cc` — 支持静态文件 + 路由的 HTTP 服务：
 
 ```bash
-./bin/http_server_test
+./bin/release/http_server_test ../web
 # 访问 http://localhost:8080/hello
 # 访问 http://localhost:8080/user?name=张三
 # curl -X POST -d "username=admin&password=123" http://localhost:8080/login
@@ -162,20 +168,45 @@ git clone https://github.com/wg/wrk.git
 cd wrk && make -j$(nproc) && sudo cp wrk /usr/local/bin/
 
 # 压测
-wrk -t4 -c100 -d30s --latency http://localhost:8080/hello
+wrk -t4 -c1000 -d30s --latency http://localhost:8080/hello
 ```
 
 **测试环境**：AMD Ryzen 7 6800H (8C8T)、8GB DDR5、Ubuntu 22.04、g++ 11.4.0 Release
 
 **目标接口**：`GET /hello`，响应体 `{"message": "Hello, World!"}`（28 bytes）
 
-| 并发数 | 持续时间 | QPS | 平均延迟 | P50 | P99 | 总请求 | Socket 错误 |
-|--------|----------|-----|----------|-----|-----|--------|-------------|
-| 100 | 30s | **44,649** | 2.23ms | 2.21ms | 4.25ms | 1,340,507 | **0** |
-| 500 | 30s | 43,320 | 11.46ms | 11.20ms | 20.83ms | 1,303,556 | **0** |
-| 1,000 | 30s | 41,703 | 23.85ms | 23.81ms | 28.92ms | 1,252,185 | **0** |
-| 2,000 | 30s | 35,480 | 56.03ms | 56.08ms | 66.31ms | 1,066,650 | **0** |
+### localhost 单机 wrk 压测（WARN 日志级别，ThreadCount=3）
 
+| 场景 | 工具 | QPS | P50 | P99 | 带宽 | 说明 |
+|------|------|-----|-----|-----|------|------|
+| c500 keep-alive | wrk -t4 | 38,715 | 12.76ms | 18.29ms | 4.54 MB/s | 延迟低 |
+| c1000 keep-alive | wrk -t4 | 37,611 | 26.44ms | 29.90ms | 4.41 MB/s | |
+| c5000 keep-alive | wrk -t4 | 37,110 | 133.27ms | 145.55ms | 4.35 MB/s | |
+| c10000 keep-alive | wrk -t4 | 37,635 | 261.74ms | 287.64ms | 4.41 MB/s | |
+| c15000 keep-alive | wrk -t4 | 38,529 | 377.65ms | 420.38ms | 4.52 MB/s | |
+| c20000 keep-alive | wrk -t4 | 39,075 | 497.57ms | 545.42ms | 4.58 MB/s | |
+| c25000 keep-alive | wrk -t4 | 38,576 | 618.93ms | 700.13ms | 4.53 MB/s | |
+| c30000 keep-alive | wrk -t4 | **43,162** | 663.66ms | 856.49ms | 5.06 MB/s | **峰值 QPS** |
+
+**关键结论：**
+- QPS 极其稳定，从 500 到 3 万连接始终维持在 **3.7-4.3 万**，吞吐几乎不受连接数影响
+- P50 延迟随连接数线性增长：c500 仅 13ms，c30000 达 664ms，每增加 5000 连接约增加 100ms
+- P99 与 P50 差距小（c30000 仅差 193ms），延迟抖动低，服务端处理均匀稳定
+- 3 万 keep-alive 长连接下服务端依然正常工作，无 segfault，无 fd 泄漏
+- 单连接 RSS ~1.5KB（Connection + 2×1024 Buffer + 内核 socket 缓冲区映射），3 万连接 ≈ 45MB
+
+### 日志级别对比
+
+| 场景 | 工具 | QPS | 带宽 | 说明 |
+|------|------|-----|------|------|
+| c100 WARN | wrk -t4 | **47,235** | 5.54 MB/s | 短路 DEBUG/INFO 日志 |
+| c100 DEBUG | wrk -t4 | 41,296 | 4.84 MB/s | QPS 降 **12.6%**，quill 异步日志开销有限 |
+
+### 内存分析
+
+- **空载 RSS**：3.8 MB（含 4 个 EventLoop 线程栈 + quill 后端线程）
+- **单连接内存开销**：~1.5KB（Connection + 收发 Buffer 各 1024 预分配 + 内核 socket 缓冲区）
+- **高并发预测**：1 万长连接 ≈ **19MB**；5 万长连接 ≈ **79MB**
 
 ---
 

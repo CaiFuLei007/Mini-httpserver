@@ -9,13 +9,14 @@ std::string ToJson(const std::string& key, const std::string& value)
     return "{\"" + key + "\": \"" + value + "\"}";
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     Log_Control::set_log_level(quill::LogLevel::Warning);
 
     HttpServer server(8080);
 
-    server.SetBaseDir("../../../web/");
+    const char* web_dir = (argc > 1) ? argv[1] : "web";
+    server.SetBaseDir(web_dir);
     server.SetThreadCount(3);
     server.SetSelfRelease(30);
 
