@@ -100,6 +100,10 @@ private:
     void TimerFdReadCallback();
 public:
     TimerWheel(std::shared_ptr<EventLoop> eventloop);
+    ~TimerWheel()
+    {
+        close(timerfd_);
+    }
 
     void SetTask(size_t id ,size_t timeout , Task task);
     void UpdateTask(size_t id);

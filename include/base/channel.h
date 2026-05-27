@@ -51,11 +51,6 @@ public:
     eventloop_(eventloop)
     {}
 
-    ~Channel()
-    {
-        close(fd_);
-    }
-
     int Fd()
     {
         return fd_;

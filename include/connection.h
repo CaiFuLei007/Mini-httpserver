@@ -35,7 +35,8 @@ enum class ConnectionStatus
 {
     CONNECTING, 
     CONNECTED , 
-    DISCONNECTING , 
+    WILLDISCONNECT , 
+    DISCONNCTINGINLOOP , 
     DISCONNECTED
 };
 

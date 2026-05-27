@@ -53,7 +53,8 @@ void Connection::ConnReadCallback()
         }
         // 出现了错误
         // 读取缓冲区中如果有数据就进行处理 , 然后发送 , 最后关闭连接
-        status_ = ConnectionStatus::DISCONNECTING;
+
+        status_ = ConnectionStatus::WILLDISCONNECT;
         if(in_buffer_->Size() > 0)
         {
             message_callback_(shared_from_this() , in_buffer_);
@@ -62,6 +63,7 @@ void Connection::ConnReadCallback()
         else
         {
             Release();
+            return ;
         }
         return ;
     }
@@ -85,16 +87,18 @@ void Connection::ConnWriteCallback()
     {
         if(errno == EAGAIN || errno == EINTR)
         {
+            // 数据未发出，放回缓冲区等待下次可写
+            out_buffer_->WriteAndPush(buf);
             return ;
         }
-        status_ = ConnectionStatus::DISCONNECTING;
+        status_ = ConnectionStatus::WILLDISCONNECT;
         // 将发送缓冲区清空 , 调用 release 销毁连接
         out_buffer_->Clear();
-        return ;
     }
-    if(status_ == ConnectionStatus::DISCONNECTING)
+    if(status_ == ConnectionStatus::WILLDISCONNECT)
     {
         Release();
+        return;
     }
     if(out_buffer_->Size() == 0)
     {
@@ -103,10 +107,12 @@ void Connection::ConnWriteCallback()
 }
 void Connection::ConnErrorCallback()
 {
+    status_ = ConnectionStatus::WILLDISCONNECT;
     Release();
 }
 void Connection::ConnCloseCallback()
 {
+    status_ = ConnectionStatus::WILLDISCONNECT;
     Release();
 }
 void Connection::ConnEventCallback()
@@ -124,10 +130,11 @@ void Connection::ConnEventCallback()
 
 void Connection::Release()
 {
-    if (status_ != ConnectionStatus::CONNECTED)
+    if (status_ != ConnectionStatus::CONNECTED &&
+        status_ != ConnectionStatus::WILLDISCONNECT)
         return;
 
-    status_ = ConnectionStatus::DISCONNECTING;
+    status_ = ConnectionStatus::DISCONNCTINGINLOOP;
     QLOG_INFO("CONNECT : {} BE RELAEASE" , conn_id_);
     eventloop_->PutIntoQueue(std::bind(&Connection::ReleaseInLoop , this));
 }

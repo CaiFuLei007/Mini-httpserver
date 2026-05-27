@@ -1,5 +1,6 @@
 
 #include "http_server.h"
+#include "base/util/quill_log.h"
 #include <iostream>
 #include <sstream>
 
@@ -10,6 +11,8 @@ std::string ToJson(const std::string& key, const std::string& value)
 
 int main()
 {
+    Log_Control::set_log_level(quill::LogLevel::Warning);
+
     HttpServer server(8080);
 
     server.SetBaseDir("../../../web/");
