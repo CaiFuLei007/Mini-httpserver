@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Esports Room - Three.js</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02030a;
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    #hud {
+      position: fixed;
+      left: 22px;
+      top: 18px;
+      z-index: 10;
+      color: #eaf7ff;
+      pointer-events: none;
+      text-shadow: 0 0 12px rgba(0, 255, 255, 0.9);
+      user-select: none;
+    }
+
+    #hud .title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: #71f6ff;
+    }
+
+    #hud .sub {
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(234, 247, 255, 0.78);
+      letter-spacing: 1px;
+    }
+
+    #tips {
+      position: fixed;
+      right: 22px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 10px 14px;
+      border: 1px solid rgba(0, 255, 255, 0.35);
+      border-radius: 14px;
+      color: rgba(235, 250, 255, 0.78);
+      background: rgba(3, 8, 20, 0.45);
+      box-shadow: 0 0 24px rgba(0, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="hud">
+    <div class="title">NEON ESPORTS ROOM</div>
+    <div class="sub">RGB · DUAL SCREEN · WATERCOOLED PC · CYBER VIBE</div>
+  </div>
+
+  <div id="tips">拖拽旋转视角 · 滚轮缩放 · 双击切换镜头</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+    const app = document.querySelector("#app");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x02030a);
+    scene.fog = new THREE.FogExp2(0x02030a, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(
+      55,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(7.2, 4.4, 7.6);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    app.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.95, -2.6);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 17;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.28;
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.95,
+      0.62,
+      0.12
+    );
+    composer.addPass(bloomPass);
+
+    const clock = new THREE.Clock();
+
+    const fanGroups = [];
+    const neonMaterials = [];
+    const keyboardKeys = [];
+    const screenUpdaters = [];
+    const holograms = [];
+    const rgbLights = [];
+
+    const ROOM_W = 12;
+    const ROOM_D = 11;
+    const ROOM_H = 5.4;
+
+    function makeStandard(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        metalness: options.metalness ?? 0.25,
+        roughness: options.roughness ?? 0.48,
+        emissive: options.emissive ?? 0x000000,
+        emissiveIntensity: options.emissiveIntensity ?? 0,
+        transparent: options.transparent ?? false,
+        opacity: options.opacity ?? 1
+      });
+    }
+
+    function makeBasic(color, options = {}) {
+      return new THREE.MeshBasicMaterial({
+        color,
+        transparent: options.transparent ?? false,
+        opacity: options.opacity ?? 1,
+        side: options.side ?? THREE.FrontSide,
+        blending: options.blending ?? THREE.NormalBlending,
+        depthWrite: options.depthWrite ?? true,
+        toneMapped: options.toneMapped ?? false
+      });
+    }
+
+    function addBox(parent, size, position, material, options = {}) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material
+      );
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(
+        options.rotation?.[0] ?? 0,
+        options.rotation?.[1] ?? 0,
+        options.rotation?.[2] ?? 0
+      );
+      mesh.castShadow = options.castShadow ?? true;
+      mesh.receiveShadow = options.receiveShadow ?? true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(parent, radiusTop, radiusBottom, height, position, material, options = {}) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, options.segments ?? 32),
+        material
+      );
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(
+        options.rotation?.[0] ?? 0,
+        options.rotation?.[1] ?? 0,
+        options.rotation?.[2] ?? 0
+      );
+      mesh.castShadow = options.castShadow ?? true;
+      mesh.receiveShadow = options.receiveShadow ?? true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addNeonBox(size, position, color, intensity = 2.5, options = {}) {
+      const material = makeStandard(color, {
+        metalness: 0.1,
+        roughness: 0.22,
+        emissive: color,
+        emissiveIntensity: intensity,
+        transparent: options.transparent ?? false,
+        opacity: options.opacity ?? 1
+      });
+
+      neonMaterials.push({
+        material,
+        base: intensity,
+        offset: Math.random() * 10
+      });
+
+      const mesh = addBox(scene, size, position, material, {
+        castShadow: false,
+        receiveShadow: false,
+        rotation: options.rotation
+      });
+
+      return mesh;
+    }
+
+    function addPointLight(color, position, intensity = 1.8, distance = 7) {
+      const light = new THREE.PointLight(color, intensity, distance, 2);
+      light.position.set(position[0], position[1], position[2]);
+      scene.add(light);
+      rgbLights.push(light);
+      return light;
+    }
+
+    // ---------- 基础灯光 ----------
+    scene.add(new THREE.HemisphereLight(0x8fdfff, 0x150020, 0.26));
+
+    const moonLight = new THREE.DirectionalLight(0xcdeaff, 0.65);
+    moonLight.position.set(-4, 7, 5);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.width = 2048;
+    moonLight.shadow.mapSize.height = 2048;
+    moonLight.shadow.camera.near = 0.5;
+    moonLight.shadow.camera.far = 30;
+    scene.add(moonLight);
+
+    addPointLight(0x00eaff, [-3.8, 2.2, -4.5], 2.2, 8);
+    addPointLight(0xff2cff, [3.8, 2.2, -3.5], 2.0, 8);
+    addPointLight(0x6bff73, [0, 2.8, -2.8], 1.4, 6);
+
+    const ceilingSpot = new THREE.SpotLight(0x77e7ff, 2.2, 11, Math.PI * 0.22, 0.7, 1.2);
+    ceilingSpot.position.set(0, 5.0, 1.8);
+    ceilingSpot.target.position.set(0, 1.1, -3.2);
+    ceilingSpot.castShadow = true;
+    scene.add(ceilingSpot);
+    scene.add(ceilingSpot.target);
+
+    // ---------- 房间 ----------
+    const wallMat = makeStandard(0x080b18, {
+      metalness: 0.15,
+      roughness: 0.72
+    });
+
+    const floorMat = makeStandard(0x050712, {
+      metalness: 0.35,
+      roughness: 0.34
+    });
+
+    addBox(scene, [ROOM_W, 0.12, ROOM_D], [0, -0.06, 0], floorMat, {
+      receiveShadow: true,
+      castShadow: false
+    });
+
+    addBox(scene, [ROOM_W, ROOM_H, 0.16], [0, ROOM_H / 2, -ROOM_D / 2], wallMat, {
+      receiveShadow: true,
+      castShadow: false
+    });
+
+    addBox(scene, [0.16, ROOM_H, ROOM_D], [-ROOM_W / 2, ROOM_H / 2, 0], wallMat, {
+      receiveShadow: true,
+      castShadow: false
+    });
+
+    addBox(scene, [0.16, ROOM_H, ROOM_D], [ROOM_W / 2, ROOM_H / 2, 0], wallMat, {
+      receiveShadow: true,
+      castShadow: false
+    });
+
+    addBox(scene, [ROOM_W, 0.14, ROOM_D], [0, ROOM_H, 0], makeStandard(0x03040b), {
+      receiveShadow: true,
+      castShadow: false
+    });
+
+    const grid = new THREE.GridHelper(ROOM_W, 44, 0x18f4ff, 0x5d36ff);
+    grid.position.y = 0.015;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.18;
+    scene.add(grid);
+
+    // 房间边缘霓虹灯带
+    addNeonBox([11.6, 0.055, 0.055], [0, 0.18, -5.36], 0x00eaff, 3.0);
+    addNeonBox([11.6, 0.055, 0.055], [0, 5.06, -5.36], 0x9d4dff, 2.8);
+    addNeonBox([0.055, 4.8, 0.055], [-5.82, 2.55, -5.35], 0xff2cdf, 2.6);
+    addNeonBox([0.055, 4.8, 0.055], [5.82, 2.55, -5.35], 0x00eaff, 2.6);
+
+    addNeonBox([0.055, 0.055, 10.6], [-5.82, 0.18, 0], 0x00ffd5, 2.1);
+    addNeonBox([0.055, 0.055, 10.6], [5.82, 0.18, 0], 0xff2cff, 2.1);
+    addNeonBox([0.055, 0.055, 10.6], [-5.82, 5.06, 0], 0x6f38ff, 1.9);
+    addNeonBox([0.055, 0.055, 10.6], [5.82, 5.06, 0], 0x00eaff, 1.9);
+
+    // ---------- Canvas 贴图 ----------
+    function makeScreenTexture(type = 0) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d");
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      function update(t) {
+        const w = canvas.width;
+        const h = canvas.height;
+
+        const hue = (t * 36 + type * 110) % 360;
+
+        const bg = ctx.createLinearGradient(0, 0, w, h);
+        bg.addColorStop(0, "#02030c");
+        bg.addColorStop(0.48, "#071028");
+        bg.addColorStop(1, "#12021e");
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+
+        ctx.strokeStyle = `hsla(${hue}, 100%, 62%, 0.42)`;
+        ctx.lineWidth = 2;
+
+        for (let x = 0; x < w; x += 48) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, h);
+          ctx.stroke();
+        }
+
+        for (let y = 0; y < h; y += 48) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+
+        // 中央波形
+        ctx.save();
+        ctx.translate(0, h * 0.55);
+        ctx.lineWidth = 5;
+        ctx.shadowColor = `hsl(${hue}, 100%, 62%)`;
+        ctx.shadowBlur = 28;
+        ctx.strokeStyle = `hsl(${hue}, 100%, 62%)`;
+        ctx.beginPath();
+
+        for (let x = 0; x <= w; x += 8) {
+          const y =
+            Math.sin(x * 0.018 + t * 3.2 + type) * 55 +
+            Math.sin(x * 0.044 - t * 1.7) * 18;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        ctx.stroke();
+        ctx.restore();
+
+        // HUD 卡片
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.34)";
+        ctx.strokeStyle = `hsla(${hue + 80}, 100%, 62%, 0.75)`;
+        ctx.lineWidth = 3;
+        roundRect(ctx, 52, 44, 318, 138, 24);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = "900 44px Arial";
+        ctx.fillStyle = "#e8fbff";
+        ctx.shadowColor = `hsl(${hue + 50}, 100%, 62%)`;
+        ctx.shadowBlur = 18;
+        ctx.fillText(type === 0 ? "FPS 240" : "STREAM ON", 78, 104);
+
+        ctx.font = "600 24px Arial";
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = `hsl(${hue}, 100%, 72%)`;
+        ctx.fillText(type === 0 ? "PING 08ms  GPU 78%" : "CHAT · DONATE · CLIPS", 80, 148);
+        ctx.restore();
+
+        // 右侧柱状图
+        ctx.save();
+        for (let i = 0; i < 18; i++) {
+          const barH = 48 + Math.abs(Math.sin(t * 2.4 + i * 0.7 + type)) * 210;
+          ctx.fillStyle = `hsla(${hue + i * 9}, 100%, 58%, 0.76)`;
+          ctx.shadowColor = ctx.fillStyle;
+          ctx.shadowBlur = 16;
+          ctx.fillRect(560 + i * 22, 420 - barH, 12, barH);
+        }
+        ctx.restore();
+
+        // 扫描线
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = "#ffffff";
+        for (let y = 0; y < h; y += 6) {
+          ctx.fillRect(0, y, w, 1);
+        }
+        ctx.restore();
+
+        texture.needsUpdate = true;
+      }
+
+      update(0);
+      screenUpdaters.push(update);
+      return texture;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function makeTextTexture(text, mainColor = "#00eaff", subText = "") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d");
+
+      const bg = ctx.createLinearGradient(0, 0, 1024, 512);
+      bg.addColorStop(0, "#050713");
+      bg.addColorStop(0.5, "#10112c");
+      bg.addColorStop(1, "#26001f");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      ctx.strokeStyle = mainColor;
+      ctx.lineWidth = 10;
+      ctx.shadowColor = mainColor;
+      ctx.shadowBlur = 38;
+      roundRect(ctx, 44, 44, 936, 424, 34);
+      ctx.stroke();
+
+      ctx.font = "900 112px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#eaffff";
+      ctx.shadowBlur = 30;
+      ctx.fillText(text, 512, 245);
+
+      ctx.font = "700 36px Arial";
+      ctx.fillStyle = mainColor;
+      ctx.shadowBlur = 18;
+      ctx.fillText(subText || "CYBER RGB ARENA", 512, 348);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function addTextPlane(text, width, height, position, color, subText = "", rotation = [0, 0, 0]) {
+      const texture = makeTextTexture(text, color, subText);
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.DoubleSide,
+          toneMapped: false
+        })
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+      scene.add(mesh);
+      return mesh;
+    }
+
+    // ---------- 电竞桌 ----------
+    const desk = new THREE.Group();
+    scene.add(desk);
+
+    const deskMat = makeStandard(0x111827, {
+      metalness: 0.55,
+      roughness: 0.26
+    });
+
+    const carbonMat = makeStandard(0x05070d, {
+      metalness: 0.65,
+      roughness: 0.3
+    });
+
+    addBox(desk, [5.4, 0.22, 1.55], [0, 1.22, -3.45], deskMat);
+    addBox(desk, [5.15, 0.055, 0.08], [0, 1.39, -2.72], makeStandard(0x00eaff, {
+      emissive: 0x00eaff,
+      emissiveIntensity: 2.8
+    }), { castShadow: false, receiveShadow: false });
+
+    addBox(desk, [0.16, 1.18, 0.16], [-2.42, 0.6, -2.9], carbonMat);
+    addBox(desk, [0.16, 1.18, 0.16], [2.42, 0.6, -2.9], carbonMat);
+    addBox(desk, [0.16, 1.18, 0.16], [-2.42, 0.6, -4.02], carbonMat);
+    addBox(desk, [0.16, 1.18, 0.16], [2.42, 0.6, -4.02], carbonMat);
+
+    addBox(desk, [3.75, 0.045, 0.92], [0, 1.37, -3.22], makeStandard(0x060713, {
+      metalness: 0.35,
+      roughness: 0.5
+    }));
+
+    addNeonBox([5.1, 0.055, 0.065], [0, 1.03, -4.22], 0xff2cff, 2.6);
+
+    // ---------- 显示器 ----------
+    function createMonitor(x, y, z, rotY, screenType) {
+      const group = new THREE.Group();
+      group.position.set(x, y, z);
+      group.rotation.y = rotY;
+      scene.add(group);
+
+      const frameMat = makeStandard(0x02030a, {
+        metalness: 0.72,
+        roughness: 0.25
+      });
+
+      addBox(group, [1.92, 1.08, 0.09], [0, 0, 0], frameMat);
+      addBox(group, [1.7, 0.86, 0.025], [0, 0, 0.06], makeStandard(0x07101c, {
+        emissive: screenType === 0 ? 0x00eaff : 0xff2cff,
+        emissiveIntensity: 0.8
+      }), { castShadow: false, receiveShadow: false });
+
+      const texture = makeScreenTexture(screenType);
+      const screen = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.66, 0.82),
+        new THREE.MeshBasicMaterial({
+          map: texture,
+          toneMapped: false
+        })
+      );
+      screen.position.set(0, 0, 0.078);
+      group.add(screen);
+
+      const glow = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.9, 1.02),
+        new THREE.MeshBasicMaterial({
+          color: screenType === 0 ? 0x00eaff : 0xff2cff,
+          transparent: true,
+          opacity: 0.08,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false
+        })
+      );
+      glow.position.set(0, 0, 0.082);
+      group.add(glow);
+
+      addBox(group, [0.13, 0.72, 0.12], [0, -0.84, 0], frameMat);
+      addBox(group, [0.88, 0.08, 0.42], [0, -1.22, 0.06], frameMat);
+
+      return group;
+    }
+
+    createMonitor(-1.08, 2.42, -4.14, 0.17, 0);
+    createMonitor(1.08, 2.42, -4.14, -0.17, 1);
+
+    // ---------- 键盘 ----------
+    function createKeyboard() {
+      const group = new THREE.Group();
+      group.position.set(-0.12, 1.46, -2.96);
+      scene.add(group);
+
+      addBox(group, [1.95, 0.08, 0.55], [0, 0, 0], makeStandard(0x04050b, {
+        metalness: 0.55,
+        roughness: 0.35
+      }));
+
+      const rows = 5;
+      const cols = 15;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const hue = (c / cols + r * 0.08) % 1;
+          const color = new THREE.Color().setHSL(hue, 1, 0.55);
+
+          const mat = makeStandard(0x101827, {
+            metalness: 0.28,
+            roughness: 0.32,
+            emissive: color,
+            emissiveIntensity: 1.25
+          });
+
+          keyboardKeys.push({
+            material: mat,
+            r,
+            c
+          });
+
+          addBox(
+            group,
+            [0.095, 0.045, 0.065],
+            [
+              -0.78 + c * 0.112,
+              0.065,
+              -0.18 + r * 0.09
+            ],
+            mat,
+            { castShadow: false, receiveShadow: false }
+          );
+        }
+      }
+
+      addBox(group, [0.68, 0.045, 0.065], [0.15, 0.066, 0.25], makeStandard(0x141d30, {
+        emissive: 0x00eaff,
+        emissiveIntensity: 1.6
+      }), { castShadow: false, receiveShadow: false });
+
+      return group;
+    }
+
+    createKeyboard();
+
+    // 鼠标
+    const mouseGroup = new THREE.Group();
+    mouseGroup.position.set(1.55, 1.48, -2.98);
+    scene.add(mouseGroup);
+
+    const mouseBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 32, 18),
+      makeStandard(0x070a12, {
+        metalness: 0.48,
+        roughness: 0.28,
+        emissive: 0x4611ff,
+        emissiveIntensity: 0.25
+      })
+    );
+    mouseBody.scale.set(0.75, 0.28, 1.08);
+    mouseBody.castShadow = true;
+    mouseBody.receiveShadow = true;
+    mouseGroup.add(mouseBody);
+
+    addBox(mouseGroup, [0.035, 0.02, 0.3], [0, 0.09, 0.01], makeStandard(0x00eaff, {
+      emissive: 0x00eaff,
+      emissiveIntensity: 2.2
+    }), { castShadow: false, receiveShadow: false });
+
+    // ---------- 主机 ----------
+    function createFan(color) {
+      const group = new THREE.Group();
+
+      const ringMat = makeStandard(color, {
+        emissive: color,
+        emissiveIntensity: 2.8,
+        metalness: 0.2,
+        roughness: 0.22
+      });
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.025, 18, 64), ringMat);
+      ring.castShadow = false;
+      ring.receiveShadow = false;
+      group.add(ring);
+
+      const hub = new THREE.Mesh(
+        new THREE.CircleGeometry(0.065, 32),
+        makeBasic(color, {
+          transparent: true,
+          opacity: 0.9,
+          side: THREE.DoubleSide,
+          toneMapped: false
+        })
+      );
+      hub.position.z = 0.008;
+      group.add(hub);
+
+      for (let i = 0; i < 5; i++) {
+        const blade = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.27, 0.018),
+          makeStandard(0x0b1220, {
+            emissive: color,
+            emissiveIntensity: 0.5
+          })
+        );
+        blade.position.y = 0.13;
+        blade.rotation.z = i * Math.PI * 0.4;
+        group.add(blade);
+      }
+
+      fanGroups.push(group);
+      return group;
+    }
+
+    function createPCTower() {
+      const group = new THREE.Group();
+      group.position.set(3.72, 1.42, -3.55);
+      scene.add(group);
+
+      const caseMat = makeStandard(0x050811, {
+        metalness: 0.75,
+        roughness: 0.25
+      });
+
+      addBox(group, [1.05, 1.95, 0.92], [0, 0, 0], caseMat);
+
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0x8defff,
+        metalness: 0,
+        roughness: 0.05,
+        transmission: 0.15,
+        transparent: true,
+        opacity: 0.28,
+        emissive: 0x003344,
+        emissiveIntensity: 0.35
+      });
+
+      addBox(group, [0.03, 1.76, 0.78], [-0.545, 0.02, 0.02], glassMat, {
+        castShadow: false,
+        receiveShadow: false
+      });
+
+      addBox(group, [0.72, 0.16, 0.1], [-0.08, 0.42, 0.24], makeStandard(0x152238, {
+        emissive: 0x00eaff,
+        emissiveIntensity: 0.55
+      }));
+
+      addBox(group, [0.55, 0.12, 0.12], [-0.12, -0.12, 0.25], makeStandard(0x29123f, {
+        emissive: 0xff2cff,
+        emissiveIntensity: 0.9
+      }));
+
+      const fan1 = createFan(0x00eaff);
+      fan1.position.set(0.26, 0.45, 0.485);
+      group.add(fan1);
+
+      const fan2 = createFan(0xff2cff);
+      fan2.position.set(0.26, -0.22, 0.485);
+      group.add(fan2);
+
+      const fan3 = createFan(0x7bff4d);
+      fan3.position.set(0.26, -0.72, 0.485);
+      fan3.scale.setScalar(0.78);
+      group.add(fan3);
+
+      addBox(group, [0.055, 1.72, 0.05], [0.54, 0.03, 0.48], makeStandard(0x00eaff, {
+        emissive: 0x00eaff,
+        emissiveIntensity: 2.8
+      }), { castShadow: false, receiveShadow: false });
+
+      addBox(group, [0.055, 1.72, 0.05], [-0.54, 0.03, 0.48], makeStandard(0xff2cff, {
+        emissive: 0xff2cff,
+        emissiveIntensity: 2.4
+      }), { castShadow: false, receiveShadow: false });
+
+      const pcLight = new THREE.PointLight(0x00eaff, 1.4, 3.5, 2);
+      pcLight.position.set(0, 0.2, 0.8);
+      group.add(pcLight);
+      rgbLights.push(pcLight);
+    }
+
+    createPCTower();
+
+    // ---------- 电竞椅 ----------
+    function createChair() {
+      const group = new THREE.Group();
+      group.position.set(0, 0, -0.95);
+      scene.add(group);
+
+      const chairMat = makeStandard(0x090a12, {
+        metalness: 0.25,
+        roughness: 0.45
+      });
+
+      const accentMat = makeStandard(0x9a34ff, {
+        metalness: 0.25,
+        roughness: 0.3,
+        emissive: 0x6d1bff,
+        emissiveIntensity: 0.8
+      });
+
+      addBox(group, [1.28, 0.22, 1.13], [0, 0.82, 0], chairMat);
+      addBox(group, [1.0, 0.08, 0.96], [0, 0.96, -0.02], accentMat);
+
+      const back = addBox(group, [1.28, 1.65, 0.24], [0, 1.62, 0.56], chairMat, {
+        rotation: [-0.18, 0, 0]
+      });
+
+      addBox(group, [0.18, 1.36, 0.06], [-0.48, 1.62, 0.43], accentMat, {
+        rotation: [-0.18, 0, 0]
+      });
+
+      addBox(group, [0.18, 1.36, 0.06], [0.48, 1.62, 0.43], accentMat, {
+        rotation: [-0.18, 0, 0]
+      });
+
+      addBox(group, [1.0, 0.18, 0.08], [0, 2.2, 0.35], makeStandard(0x00eaff, {
+        emissive: 0x00eaff,
+        emissiveIntensity: 1.6
+      }), {
+        rotation: [-0.18, 0, 0],
+        castShadow: false,
+        receiveShadow: false
+      });
+
+      addBox(group, [0.22, 0.12, 0.78], [-0.82, 1.1, -0.08], chairMat);
+      addBox(group, [0.22, 0.12, 0.78], [0.82, 1.1, -0.08], chairMat);
+      addBox(group, [0.12, 0.56, 0.12], [-0.82, 0.76, -0.08], chairMat);
+      addBox(group, [0.12, 0.56, 0.12], [0.82, 0.76, -0.08], chairMat);
+
+      addCylinder(group, 0.12, 0.12, 0.74, [0, 0.42, 0], makeStandard(0x0d111a, {
+        metalness: 0.85,
+        roughness: 0.2
+      }));
+
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const x = Math.cos(a) * 0.52;
+        const z = Math.sin(a) * 0.52;
+
+        addBox(group, [0.82, 0.075, 0.09], [x * 0.5, 0.16, z * 0.5], chairMat, {
+          rotation: [0, -a, 0]
+        });
+
+        addCylinder(group, 0.085, 0.085, 0.055, [x, 0.08, z], makeStandard(0x05060c), {
+          rotation: [Math.PI / 2, 0, 0],
+          segments: 24
+        });
+      }
+
+      return group;
+    }
+
+    createChair();
+
+    // ---------- 墙面装饰 ----------
+    addTextPlane("LEVEL UP", 2.2, 1.08, [-2.35, 3.25, -5.41], "#00eaff", "VICTORY MODE");
+    addTextPlane("GG WP", 1.65, 1.08, [2.55, 3.18, -5.41], "#ff2cff", "NEON ARENA");
+
+    const logoRingMat = makeStandard(0x00eaff, {
+      emissive: 0x00eaff,
+      emissiveIntensity: 3.2,
+      metalness: 0.2,
+      roughness: 0.2
+    });
+
+    const logoRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.025, 24, 96), logoRingMat);
+    logoRing.position.set(0, 3.85, -5.39);
+    scene.add(logoRing);
+    neonMaterials.push({
+      material: logoRingMat,
+      base: 3.2,
+      offset: 4
+    });
+
+    const triangleShape = new THREE.Shape();
+    triangleShape.moveTo(0, 0.46);
+    triangleShape.lineTo(-0.45, -0.32);
+    triangleShape.lineTo(0.45, -0.32);
+    triangleShape.lineTo(0, 0.46);
+
+    const triangleGeo = new THREE.ShapeGeometry(triangleShape);
+    const triangle = new THREE.Mesh(
+      triangleGeo,
+      makeBasic(0xff2cff, {
+        transparent: true,
+        opacity: 0.88,
+        side: THREE.DoubleSide,
+        toneMapped: false
+      })
+    );
+    triangle.position.set(0, 3.85, -5.38);
+    scene.add(triangle);
+
+    // 吸音棉墙
+    const panelMatA = makeStandard(0x0c1224, { roughness: 0.82 });
+    const panelMatB = makeStandard(0x190a2a, { roughness: 0.82 });
+
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 8; c++) {
+        addBox(
+          scene,
+          [0.45, 0.45, 0.045],
+          [-1.75 + c * 0.5, 1.05 + r * 0.5, -5.37],
+          (r + c) % 2 === 0 ? panelMatA : panelMatB,
+          { castShadow: false, receiveShadow: true }
+        );
+      }
+    }
+
+    // 右墙赛博城市窗
+    function makeCityTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 768;
+      canvas.height = 768;
+      const ctx = canvas.getContext("2d");
+
+      const bg = ctx.createLinearGradient(0, 0, 0, 768);
+      bg.addColorStop(0, "#06122b");
+      bg.addColorStop(0.55, "#110722");
+      bg.addColorStop(1, "#02030a");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 768, 768);
+
+      for (let i = 0; i < 80; i++) {
+        const x = Math.random() * 768;
+        const y = Math.random() * 280;
+        ctx.fillStyle = "rgba(180, 255, 255, 0.75)";
+        ctx.fillRect(x, y, Math.random() * 2 + 1, Math.random() * 2 + 1);
+      }
+
+      for (let i = 0; i < 22; i++) {
+        const w = 24 + Math.random() * 42;
+        const h = 140 + Math.random() * 350;
+        const x = i * 36 + Math.random() * 24;
+        const y = 768 - h;
+        ctx.fillStyle = `hsl(${190 + Math.random() * 110}, 70%, ${10 + Math.random() * 12}%)`;
+        ctx.fillRect(x, y, w, h);
+
+        for (let wy = y + 18; wy < 748; wy += 28) {
+          for (let wx = x + 7; wx < x + w - 7; wx += 14) {
+            ctx.fillStyle = Math.random() > 0.45 ? "rgba(0,255,255,0.75)" : "rgba(255,0,200,0.55)";
+            ctx.fillRect(wx, wy, 5, 9);
+          }
+        }
+      }
+
+      ctx.strokeStyle = "rgba(0, 238, 255, 0.7)";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(22, 22, 724, 724);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    const cityWindow = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.25, 2.15),
+      new THREE.MeshBasicMaterial({
+        map: makeCityTexture(),
+        toneMapped: false
+      })
+    );
+    cityWindow.position.set(5.91, 2.78, -1.15);
+    cityWindow.rotation.y = -Math.PI / 2;
+    scene.add(cityWindow);
+
+    addNeonBox([0.05, 2.35, 0.05], [5.82, 2.78, -2.32], 0x00eaff, 2.2);
+    addNeonBox([0.05, 2.35, 0.05], [5.82, 2.78, 0.02], 0xff2cff, 2.2);
+    addNeonBox([0.05, 0.05, 2.35], [5.82, 3.95, -1.15], 0x00eaff, 2.2, {
+      rotation: [0, Math.PI / 2, 0]
+    });
+    addNeonBox([0.05, 0.05, 2.35], [5.82, 1.61, -1.15], 0xff2cff, 2.2, {
+      rotation: [0, Math.PI / 2, 0]
+    });
+
+    // ---------- 左侧展示架 ----------
+    function createShelf() {
+      const shelfMat = makeStandard(0x0b1020, {
+        metalness: 0.52,
+        roughness: 0.35
+      });
+
+      for (let i = 0; i < 3; i++) {
+        const y = 1.75 + i * 0.8;
+        addBox(scene, [0.45, 0.1, 2.15], [-5.72, y, -3.55], shelfMat);
+        addNeonBox([0.055, 0.055, 1.95], [-5.48, y + 0.08, -3.55], i % 2 ? 0xff2cff : 0x00eaff, 1.8);
+      }
+
+      const colors = [0x00eaff, 0xff2cff, 0x74ff4f, 0xffd24a];
+
+      for (let i = 0; i < 10; i++) {
+        const y = 1.95 + Math.floor(i / 4) * 0.8;
+        const z = -4.25 + (i % 4) * 0.45;
+
+        const itemMat = makeStandard(colors[i % colors.length], {
+          emissive: colors[i % colors.length],
+          emissiveIntensity: 0.6,
+          metalness: 0.4,
+          roughness: 0.3
+        });
+
+        if (i % 3 === 0) {
+          addCylinder(scene, 0.12, 0.12, 0.34, [-5.44, y, z], itemMat, {
+            segments: 32
+          });
+        } else if (i % 3 === 1) {
+          const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.17, 32, 16), itemMat);
+          sphere.position.set(-5.44, y, z);
+          sphere.castShadow = true;
+          scene.add(sphere);
+        } else {
+          addBox(scene, [0.26, 0.26, 0.26], [-5.44, y, z], itemMat, {
+            rotation: [0.3, 0.4, 0.15]
+          });
+        }
+      }
+    }
+
+    createShelf();
+
+    // ---------- 线缆 ----------
+    function addCable(points, color = 0x111827, radius = 0.018) {
+      const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+      const geo = new THREE.TubeGeometry(curve, 64, radius, 8, false);
+      const mesh = new THREE.Mesh(
+        geo,
+        makeStandard(color, {
+          metalness: 0.15,
+          roughness: 0.75,
+          emissive: color,
+          emissiveIntensity: 0.18
+        })
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    addCable([
+      [-0.9, 1.42, -3.0],
+      [-1.2, 1.36, -3.42],
+      [-1.1, 1.55, -3.9],
+      [-1.03, 1.87, -4.08]
+    ], 0x00eaff, 0.014);
+
+    addCable([
+      [0.95, 1.42, -3.02],
+      [1.45, 1.33, -3.42],
+      [1.28, 1.7, -3.95],
+      [1.06, 1.92, -4.08]
+    ], 0xff2cff, 0.014);
+
+    addCable([
+      [3.15, 1.32, -3.65],
+      [2.55, 1.16, -3.78],
+      [1.8, 1.18, -3.62],
+      [1.25, 1.54, -4.02]
+    ], 0x171b2a, 0.022);
+
+    // ---------- 桌面全息物 ----------
+    function createHologram() {
+      const group = new THREE.Group();
+      group.position.set(0, 1.98, -3.08);
+      scene.add(group);
+
+      const holoMat = makeBasic(0x00eaff, {
+        transparent: true,
+        opacity: 0.42,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+
+      const core = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.34, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0x00eaff,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.68,
+          blending: THREE.AdditiveBlending,
+          toneMapped: false
+        })
+      );
+      group.add(core);
+
+      const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.01, 8, 96), holoMat);
+      ring1.rotation.x = Math.PI / 2;
+      group.add(ring1);
+
+      const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.01, 8, 96), holoMat);
+      ring2.rotation.y = Math.PI / 2;
+      group.add(ring2);
+
+      const beam = new THREE.Mesh(
+        new THREE.ConeGeometry(0.7, 1.2, 48, 1, true),
+        makeBasic(0x00eaff, {
+          transparent: true,
+          opacity: 0.08,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        })
+      );
+      beam.position.y = -0.45;
+      beam.rotation.x = Math.PI;
+      group.add(beam);
+
+      holograms.push(group);
+      return group;
+    }
+
+    createHologram();
+
+    // ---------- 空气粒子 ----------
+    const particleCount = 520;
+    const particlePositions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      particlePositions[i * 3] = (Math.random() - 0.5) * 10.8;
+      particlePositions[i * 3 + 1] = Math.random() * 4.8 + 0.2;
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 9.5;
+    }
+
+    const particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+
+    const particles = new THREE.Points(
+      particleGeo,
+      new THREE.PointsMaterial({
+        color: 0x7df8ff,
+        size: 0.027,
+        transparent: true,
+        opacity: 0.58,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+
+    scene.add(particles);
+
+    // ---------- 镜头切换 ----------
+    const cameraViews = [
+      {
+        pos: new THREE.Vector3(7.2, 4.4, 7.6),
+        target: new THREE.Vector3(0, 1.95, -2.6)
+      },
+      {
+        pos: new THREE.Vector3(0.2, 2.7, 3.25),
+        target: new THREE.Vector3(0, 2.05, -3.55)
+      },
+      {
+        pos: new THREE.Vector3(-5.2, 3.2, 1.7),
+        target: new THREE.Vector3(0.9, 1.9, -3.55)
+      },
+      {
+        pos: new THREE.Vector3(4.75, 2.3, -1.35),
+        target: new THREE.Vector3(0.75, 1.8, -3.75)
+      }
+    ];
+
+    let viewIndex = 0;
+    let desiredCameraPos = cameraViews[0].pos.clone();
+    let desiredTarget = cameraViews[0].target.clone();
+
+    window.addEventListener("dblclick", () => {
+      viewIndex = (viewIndex + 1) % cameraViews.length;
+      desiredCameraPos = cameraViews[viewIndex].pos.clone();
+      desiredTarget = cameraViews[viewIndex].target.clone();
+    });
+
+    // ---------- 动画 ----------
+    function animate() {
+      const delta = clock.getDelta();
+      const t = clock.getElapsedTime();
+
+      controls.autoRotate = viewIndex === 0;
+
+      camera.position.lerp(desiredCameraPos, 0.018);
+      controls.target.lerp(desiredTarget, 0.02);
+
+      for (const update of screenUpdaters) {
+        update(t);
+      }
+
+      for (const fan of fanGroups) {
+        fan.rotation.z -= delta * 9.5;
+      }
+
+      for (const item of neonMaterials) {
+        item.material.emissiveIntensity =
+          item.base * (0.74 + Math.sin(t * 2.2 + item.offset) * 0.18 + 0.16);
+      }
+
+      for (let i = 0; i < rgbLights.length; i++) {
+        rgbLights[i].color.setHSL((t * 0.055 + i * 0.16) % 1, 1, 0.62);
+        rgbLights[i].intensity = 1.25 + Math.sin(t * 1.6 + i) * 0.35;
+      }
+
+      for (const key of keyboardKeys) {
+        const hue = (t * 0.12 + key.c * 0.022 + key.r * 0.055) % 1;
+        key.material.emissive.setHSL(hue, 1, 0.52);
+        key.material.color.setHSL(hue, 0.5, 0.08);
+      }
+
+      for (const holo of holograms) {
+        holo.rotation.y += delta * 0.75;
+        holo.rotation.x = Math.sin(t * 0.9) * 0.12;
+        holo.position.y = 1.98 + Math.sin(t * 1.7) * 0.06;
+      }
+
+      logoRing.rotation.z += delta * 0.22;
+      triangle.rotation.z -= delta * 0.12;
+
+      particles.rotation.y = Math.sin(t * 0.16) * 0.08;
+      particles.position.y = Math.sin(t * 0.45) * 0.04;
+
+      controls.update();
+      composer.render();
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // ---------- 自适应 ----------
+    window.addEventListener("resize", () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

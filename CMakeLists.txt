@@ -33,11 +33,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1")
 #                         生成可执行程序
 # =================================================================
 
-file(GLOB SRC_LISTS 
+file(GLOB SRC_LISTS
     "src/*.cc"
     "src/base/*.cc"
     "src/base/util/*.cc"
     "src/server/*.cc"
+    "src/protocal/http/*.cc"
     "Test/*.hpp"
 )
 
@@ -45,10 +46,14 @@ add_executable(all_test
     Test/all_test.cc
     ${SRC_LISTS}
 )
-# add_executable(echo_server
-#     Test/echo_server.cc
-#     ${SRC_LISTS}
-# )
+add_executable(echo_server
+    Test/echo_server.cc
+    ${SRC_LISTS}
+)
+add_executable(http_server_test
+    Test/http_server_test.cc
+    ${SRC_LISTS}
+)
 
 # =================================================================
 #                         添加依赖
