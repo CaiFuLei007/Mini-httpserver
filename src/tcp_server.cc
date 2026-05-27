@@ -4,6 +4,7 @@
 
 void TcpServer::CloseConnection(std::shared_ptr<Connection> conn)
 {
+    std::unique_lock lock(mutex_);
     int id = conn->Id();
     connections_.erase(id);
 }
@@ -31,6 +32,8 @@ void TcpServer::AcceptCallback(int fd)
     {
         new_conn->SetSelfRelease(timeout_);
     }
+    
+    std::unique_lock lock(mutex_);
     connections_.emplace(next_id_++ , new_conn);
     new_conn->Ready();
     return ;

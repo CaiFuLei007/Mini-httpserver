@@ -20,7 +20,7 @@
 
 class Socket
 {
-    static constexpr size_t kDefaultListenCapacity = 1024;
+    static constexpr size_t kDefaultListenCapacity = 10240;
 private:
     int socketfd_;
 

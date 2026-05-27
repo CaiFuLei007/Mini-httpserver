@@ -38,6 +38,7 @@ private:
     Acceptor acceptor_;
     LoopThreadPoll threadpoll_;
     std::unordered_map<uint64_t , std::shared_ptr<Connection> > connections_;
+    std::mutex mutex_;
 
     MessageCallback message_callback_;
     NewConnectCallback newconnect_callback_;

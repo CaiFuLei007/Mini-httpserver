@@ -12,7 +12,7 @@ int main()
 {
     HttpServer server(8080);
 
-    server.SetBaseDir("/home/banju/Mini-httpserver/web");
+    server.SetBaseDir("../../../web/");
     server.SetThreadCount(3);
     server.SetSelfRelease(30);
 

@@ -7,17 +7,19 @@
 
 void Acceptor::AcceptReadCallback()
 {
-    int fd = socket_.Accept();
-    if(fd < 0)
+    // 循环 accept，一次性清空当前就绪队列
+    while (true)
     {
-        QLOG_ERROR("SOCKET ACCEPT FAIL");
-        return ;
-    }
-
-    if(new_connect_cb_)
-    {
-        new_connect_cb_(fd);
-        return ;
+        int fd = socket_.Accept();
+        if (fd < 0)
+        {
+            if (errno == EAGAIN || errno == EINTR || errno == ECONNABORTED)
+                break;
+            QLOG_ERROR("SOCKET ACCEPT FAIL : {}" , strerror(errno));
+            break;
+        }
+        if (new_connect_cb_)
+            new_connect_cb_(fd);
     }
 }
 

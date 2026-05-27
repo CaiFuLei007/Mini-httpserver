@@ -10,9 +10,21 @@ void Connection::ReleaseInLoop()
     // 关闭当前连接
     // 1. 关闭事件监控
     // 2. 调用 用户close回调
+    // 3. 如果设置了定时销毁 , 删除
     // 3. 调用 svr_close 回调 , 移除 conn
 
+    if(status_ == ConnectionStatus::DISCONNECTED)
+    {
+        return ;
+    }
+
+    status_ = ConnectionStatus::DISCONNECTED;
     eventloop_->RemvoeEvent(channel_);
+    if(is_selfrelease_)
+    {
+        eventloop_->CancelTimedJob(conn_id_);
+    }
+
     if(close_callback_)
     {
         close_callback_(shared_from_this());
@@ -26,77 +38,65 @@ void Connection::ReleaseInLoop()
 
 void Connection::ConnReadCallback()
 {
+    // 连接读取事件的回调
+    // 1. 将数据读取到缓冲区中
+    // 2. 调用用户的回调
+    // 3. 打开写事件
+
     std::string buf;
-    ssize_t ret = socket_.RecvNoBlock(buf);
-    if (ret < 0)
+    int ret = socket_.RecvNoBlock(buf);
+    if(ret <= 0)
     {
-        if (errno == EAGAIN || errno == EINTR)
+        if(ret < 0 && (errno == EAGAIN || errno == EINTR))
         {
-            return;
+            return ;
         }
+        // 出现了错误
+        // 读取缓冲区中如果有数据就进行处理 , 然后发送 , 最后关闭连接
         status_ = ConnectionStatus::DISCONNECTING;
-        if (in_buffer_->Size() > 0)
+        if(in_buffer_->Size() > 0)
         {
-            message_callback_(shared_from_this(), in_buffer_);
+            message_callback_(shared_from_this() , in_buffer_);
             channel_->WriteAble();
         }
         else
         {
             Release();
         }
-        return;
-    }
-    if (ret == 0)
-    {
-        status_ = ConnectionStatus::DISCONNECTING;
-        if (in_buffer_->Size() > 0)
-        {
-            message_callback_(shared_from_this(), in_buffer_);
-            channel_->WriteAble();
-        }
-        else
-        {
-            Release();
-        }
-        return;
+        return ;
     }
     in_buffer_->WriteAndPush(buf);
 
-    if (message_callback_ && in_buffer_->Size() > 0)
+    if(message_callback_)
     {
-        message_callback_(shared_from_this(), in_buffer_);
+        message_callback_(shared_from_this() , in_buffer_);
         channel_->WriteAble();
+        return ;
     }
 }
 void Connection::ConnWriteCallback()
 {
-    // 先 peek 数据，再按实际发送量 pop，避免数据丢失
+    // 连接写事件的回调
+    // 1. 将数据从缓冲区中发送出去
     std::string buf;
-    out_buffer_->Read(buf);
-    if (buf.empty())
+    out_buffer_->ReadAndPop(buf);
+    int ret = socket_.SendNoBlock(buf);
+    if(ret < 0)
     {
-        channel_->UnWriteAble();
-        return;
-    }
-
-    ssize_t ret = socket_.SendNoBlock(buf);
-    if (ret < 0)
-    {
-        if (errno == EAGAIN || errno == EINTR)
+        if(errno == EAGAIN || errno == EINTR)
         {
-            return;  // 数据留在缓冲区，等待下次可写
+            return ;
         }
         status_ = ConnectionStatus::DISCONNECTING;
+        // 将发送缓冲区清空 , 调用 release 销毁连接
         out_buffer_->Clear();
-        return;
+        return ;
     }
-    out_buffer_->MoveReadAddr(static_cast<size_t>(ret));
-
-    if (status_ == ConnectionStatus::DISCONNECTING)
+    if(status_ == ConnectionStatus::DISCONNECTING)
     {
         Release();
     }
-    if (out_buffer_->Size() == 0)
+    if(out_buffer_->Size() == 0)
     {
         channel_->UnWriteAble();
     }
@@ -124,7 +124,10 @@ void Connection::ConnEventCallback()
 
 void Connection::Release()
 {
-    status_ = ConnectionStatus::DISCONNECTED;
+    if (status_ != ConnectionStatus::CONNECTED)
+        return;
+
+    status_ = ConnectionStatus::DISCONNECTING;
     QLOG_INFO("CONNECT : {} BE RELAEASE" , conn_id_);
     eventloop_->PutIntoQueue(std::bind(&Connection::ReleaseInLoop , this));
 }
