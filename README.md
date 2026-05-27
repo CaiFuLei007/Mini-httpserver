@@ -1,4 +1,4 @@
-# MiniMuduo - 轻量级 C++ HTTP 服务器
+# Mini-httpserver - 轻量级 C++ HTTP 服务器
 
 **作者**：CaiFuLei007  
 **开发环境**：Ubuntu VS Code  
