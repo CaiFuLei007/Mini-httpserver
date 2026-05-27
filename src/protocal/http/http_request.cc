@@ -22,7 +22,7 @@ std::string HttpRequest::GetHeader(const std::string& key)
 }
 
 
-size_t HttpRequest::BodyLength()
+size_t HttpRequest::ContentLength()
 {
     auto it = headers_.find("Content-Length");
     if(it == headers_.end())

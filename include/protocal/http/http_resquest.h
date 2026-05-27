@@ -1,5 +1,5 @@
 
-
+#pragma once
 
 
 /*
@@ -99,8 +99,23 @@ public:
     {
         return keepalive_;
     }    
+
+    void Clear()
+    {
+        method_ = path_ = version_ = "" ;
+        params_.clear();
+        headers_.clear();
+
+        body_.clear();
+        keepalive_ = false;
+    }
     
     std::string GetParam(const std::string &key);
     std::string GetHeader(const std::string& key);
-    size_t BodyLength();
+    size_t ContentLength();
+
+    size_t BodyLength()
+    {
+        return body_.size();
+    }
 };

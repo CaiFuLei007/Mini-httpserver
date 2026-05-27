@@ -13,6 +13,7 @@
             5) 两个缓冲区 , 接收数据
             6) 连接对应的 Socket
             7) 连接是否设置定时销毁 , 以及定时销毁事件
+            8) 连接的上下文
     - 接口 :
             1) 四个新连接的回调
             2) 从连接发送数据的接口
@@ -25,6 +26,7 @@
 #include <iostream>
 #include <memory>
 #include <functional>
+#include <any>
 
 class Channel;
 class EventLoop;
@@ -64,6 +66,8 @@ private:
     uint16_t timeout_;
 
     enum ConnectionStatus status_;
+
+    std::any context_;
 private:
     void ReleaseInLoop();
 
@@ -112,6 +116,16 @@ public:
     {
         is_selfrelease_ = true;
         timeout_ = timeout;
+    }
+
+    void SetContext(const std::any context)
+    {
+        context_ = context;
+    }
+
+    std::any& GetContext()
+    {
+        return context_;
     }
 
     void Ready();

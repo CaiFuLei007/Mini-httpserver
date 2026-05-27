@@ -20,12 +20,7 @@ std::string HttpResponse::GetHeader(const std::string& key)
     return it->second;
 }
 
-size_t HttpResponse::BodyLength()
+size_t HttpResponse::ContentLength()
 {
-    auto it = headers_.find("Content-Length");
-    if(it == headers_.end())
-    {
-        return 0;
-    }
-    return std::stoul(it->second);
+    return body_.size();
 }

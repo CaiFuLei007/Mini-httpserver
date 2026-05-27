@@ -23,6 +23,8 @@
 #include "server/loopthread_poll.h"
 #include "connection.h"
 
+#include <any>
+
 class TcpServer
 {
     using MessageCallback = std::function<void(std::shared_ptr<Connection> , std::shared_ptr<Buffer> buf)>;

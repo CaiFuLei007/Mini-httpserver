@@ -64,7 +64,11 @@ size_t Socket::Recv(std::string& buf)
 {   
     char tmp[1024]{0};
     memset(&tmp, 0, sizeof(tmp));
-    ssize_t ret = recv(socketfd_ , tmp , sizeof(buf) / sizeof(char) , 0);
+    ssize_t ret = recv(socketfd_ , tmp , sizeof(tmp) / sizeof(char) , 0);
+    if(ret <= 0)
+    {
+        return ret;
+    }
     buf = std::string(&tmp[0] , &tmp[0] + ret);
     
     return ret;
@@ -127,7 +131,11 @@ size_t Socket::RecvNoBlock(std::string& buf)
 {
     char tmp[1024]{0};
     memset(&tmp, 0, sizeof(tmp));
-    ssize_t ret = recv(socketfd_ , tmp , sizeof(buf) / sizeof(char) , MSG_DONTWAIT);
+    ssize_t ret = recv(socketfd_ , tmp , sizeof(tmp) / sizeof(char) , MSG_DONTWAIT);
+    if(ret <= 0)
+    {
+        return ret;
+    }
     buf = std::string(&tmp[0] , &tmp[0] + ret);
     return ret;
 }

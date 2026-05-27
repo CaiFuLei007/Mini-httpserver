@@ -20,7 +20,7 @@
 class HttpResponse
 {
 private:
-    std::string method_;
+    std::string version_;
     int response_code_;
 
     std::unordered_map<std::string , std::string > params_;
@@ -33,20 +33,20 @@ private:
     std::string redirect_url_;
 public:
     HttpResponse()
-    :method_("HTTP/1.1") ,
+    :version_("HTTP/1.1") ,
     response_code_(200) , 
     keepalive_(false) , 
     is_redirect_(false)
     {}
     
-    void SetMethod(const std::string &method)
+    void SetVersion(const std::string &version)
     {
-        method_ = method;
+        version_ = version;
     }
 
-    std::string GetMethod()
+    std::string GetVersion()
     {
-        return method_;
+        return version_;
     }
 
     void SetResponseCode(int code)
@@ -79,9 +79,10 @@ public:
         return keepalive_;
     }
 
-    void SetBody(const std::string& body)
+    void SetBody(const std::string& body , const std::string &file_type)
     {
         body_ = body;
+        SetHeader("Content-Type" , file_type);
     }
 
     std::string GetBody()
@@ -93,10 +94,15 @@ public:
     {
         body_ += data;
     }
+
+    std::unordered_map<std::string , std::string>& GetAllHeaders()
+    {
+        return headers_;
+    }
     
     std::string GetParam(const std::string &key);
     std::string GetHeader(const std::string& key);
-    size_t BodyLength();
+    size_t ContentLength();
 
     void SetRedirect(const std::string& url)
     {
