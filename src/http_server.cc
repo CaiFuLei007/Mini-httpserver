@@ -4,9 +4,6 @@
 #include "base/util/file_util.h"
 #include "base/util/http_util.h"
 
-#include <sstream>
-
-
 void HttpServer::HandleError(std::shared_ptr<HttpResponse> response)
 {
     // 根据错误码 , 来组织错误
@@ -21,22 +18,40 @@ void HttpServer::HandleError(std::shared_ptr<HttpResponse> response)
 void SendResponse(std::shared_ptr<Connection> conn , std::shared_ptr<HttpResponse> response)
 {
     int response_code = response->GetResponseCode();
+    const std::string& body = response->GetBody();
+    std::string code_des = HttpUtil::GetResponseCodeDes(response_code);
 
-    std::ostringstream oss;
-    oss << response->GetVersion() << " " << response_code << " " << HttpUtil::GetResponseCodeDes(response_code) << "\r\n";
-    for(auto& [key , value] : response->GetAllHeaders())
-    {
-        oss << key << ": " << value << "\r\n";
-    }
-    if(response->KeepAlive())
-    {
-        oss << "Connection: keep-alive" << "\r\n";
-    }
-    oss << "Content-Length: " << response->ContentLength() << "\r\n";
-    oss << "\r\n";
-    oss << response->GetBody();
+    // 预估大小，一次性 reserve 减少内存分配
+    size_t header_est = 128;
+    for (auto& [key, value] : response->GetAllHeaders())
+        header_est += key.size() + value.size() + 4;
+    std::string msg;
+    msg.reserve(header_est + body.size());
 
-    conn->SendMessage(oss.str());
+    msg += response->GetVersion();
+    msg += ' ';
+    msg += std::to_string(response_code);
+    msg += ' ';
+    msg += code_des;
+    msg += "\r\n";
+    for (auto& [key, value] : response->GetAllHeaders())
+    {
+        msg += key;
+        msg += ": ";
+        msg += value;
+        msg += "\r\n";
+    }
+    if (response->KeepAlive())
+    {
+        msg += "Connection: keep-alive\r\n";
+    }
+    msg += "Content-Length: ";
+    msg += std::to_string(response->ContentLength());
+    msg += "\r\n";
+    msg += "\r\n";
+    msg += body;
+
+    conn->SendMessage(msg);
 }
 
 bool HttpServer::IsFileRequest(std::shared_ptr<HttpRequest> request)

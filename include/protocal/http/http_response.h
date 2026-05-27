@@ -35,7 +35,7 @@ public:
     HttpResponse()
     :version_("HTTP/1.1") ,
     response_code_(200) , 
-    keepalive_(false) , 
+    keepalive_(true) , 
     is_redirect_(false)
     {}
     

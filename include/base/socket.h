@@ -20,7 +20,7 @@
 
 class Socket
 {
-    static constexpr size_t kDefaultListenCapacity = 10;
+    static constexpr size_t kDefaultListenCapacity = 1024;
 private:
     int socketfd_;
 
@@ -52,8 +52,8 @@ public:
     size_t Recv(std::string& buf);
     bool Send(const std::string& buf);
 
-    size_t RecvNoBlock(std::string& buf);
-    bool SendNoBlock(const std::string& buf);
+    ssize_t RecvNoBlock(std::string& buf);
+    ssize_t SendNoBlock(const std::string& buf);
 
     bool CreateServer(uint16_t port ,  const std::string& ip = "0.0.0.0");
     bool CreateClient(uint16_t port , const std::string &ip);

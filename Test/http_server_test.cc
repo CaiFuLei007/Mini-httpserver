@@ -12,9 +12,9 @@ int main()
 {
     HttpServer server(8080);
 
-    server.SetBaseDir("/home/banju/Mini-moduo/web");
-    // server.SetThreadCount(3);
-    // server.SetSelfRelease(30);
+    server.SetBaseDir("/home/banju/Mini-httpserver/web");
+    server.SetThreadCount(3);
+    server.SetSelfRelease(30);
 
     // GET /hello
     server.Get("/hello", [](std::shared_ptr<HttpRequest> req, std::shared_ptr<HttpResponse> resp) {

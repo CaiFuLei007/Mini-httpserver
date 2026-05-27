@@ -127,27 +127,20 @@ void Socket::ReuseAddr()
     setsockopt(socketfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 }
 
-size_t Socket::RecvNoBlock(std::string& buf)
+ssize_t Socket::RecvNoBlock(std::string& buf)
 {
-    char tmp[1024]{0};
-    memset(&tmp, 0, sizeof(tmp));
-    ssize_t ret = recv(socketfd_ , tmp , sizeof(tmp) / sizeof(char) , MSG_DONTWAIT);
-    if(ret <= 0)
+    char tmp[8192]{0};
+    ssize_t ret = recv(socketfd_ , tmp , sizeof(tmp) , MSG_DONTWAIT);
+    if (ret > 0)
     {
-        return ret;
+        buf = std::string(&tmp[0], &tmp[0] + ret);
     }
-    buf = std::string(&tmp[0] , &tmp[0] + ret);
     return ret;
 }
 
-bool Socket::SendNoBlock(const std::string& buf)
+ssize_t Socket::SendNoBlock(const std::string& buf)
 {
-    ssize_t ret = send(socketfd_ , buf.c_str() , buf.size() , MSG_DONTWAIT);
-    if(ret < 0)
-    {
-        return false;
-    }
-    return true;
+    return send(socketfd_ , buf.c_str() , buf.size() , MSG_DONTWAIT);
 }
 
 bool Socket::CreateClient(uint16_t port , const std::string &ip)

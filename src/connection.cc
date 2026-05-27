@@ -26,65 +26,77 @@ void Connection::ReleaseInLoop()
 
 void Connection::ConnReadCallback()
 {
-    // 连接读取事件的回调
-    // 1. 将数据读取到缓冲区中
-    // 2. 调用用户的回调
-    // 3. 打开写事件
-
     std::string buf;
-    int ret = socket_.RecvNoBlock(buf);
-    if(ret <= 0)
+    ssize_t ret = socket_.RecvNoBlock(buf);
+    if (ret < 0)
     {
-        if(ret < 0 && (errno == EAGAIN || errno == EINTR))
+        if (errno == EAGAIN || errno == EINTR)
         {
-            return ;
+            return;
         }
-        // 出现了错误
-        // 读取缓冲区中如果有数据就进行处理 , 然后发送 , 最后关闭连接
         status_ = ConnectionStatus::DISCONNECTING;
-        if(in_buffer_->Size() > 0)
+        if (in_buffer_->Size() > 0)
         {
-            message_callback_(shared_from_this() , in_buffer_);
+            message_callback_(shared_from_this(), in_buffer_);
             channel_->WriteAble();
         }
         else
         {
             Release();
         }
-        return ;
+        return;
+    }
+    if (ret == 0)
+    {
+        status_ = ConnectionStatus::DISCONNECTING;
+        if (in_buffer_->Size() > 0)
+        {
+            message_callback_(shared_from_this(), in_buffer_);
+            channel_->WriteAble();
+        }
+        else
+        {
+            Release();
+        }
+        return;
     }
     in_buffer_->WriteAndPush(buf);
 
-    if(message_callback_)
+    if (message_callback_ && in_buffer_->Size() > 0)
     {
-        message_callback_(shared_from_this() , in_buffer_);
+        message_callback_(shared_from_this(), in_buffer_);
         channel_->WriteAble();
-        return ;
     }
 }
 void Connection::ConnWriteCallback()
 {
-    // 连接写事件的回调
-    // 1. 将数据从缓冲区中发送出去
+    // 先 peek 数据，再按实际发送量 pop，避免数据丢失
     std::string buf;
-    out_buffer_->ReadAndPop(buf);
-    int ret = socket_.SendNoBlock(buf);
-    if(ret < 0)
+    out_buffer_->Read(buf);
+    if (buf.empty())
     {
-        if(errno == EAGAIN || errno == EINTR)
+        channel_->UnWriteAble();
+        return;
+    }
+
+    ssize_t ret = socket_.SendNoBlock(buf);
+    if (ret < 0)
+    {
+        if (errno == EAGAIN || errno == EINTR)
         {
-            return ;
+            return;  // 数据留在缓冲区，等待下次可写
         }
         status_ = ConnectionStatus::DISCONNECTING;
-        // 将发送缓冲区清空 , 调用 release 销毁连接
         out_buffer_->Clear();
-        return ;
+        return;
     }
-    if(status_ == ConnectionStatus::DISCONNECTING)
+    out_buffer_->MoveReadAddr(static_cast<size_t>(ret));
+
+    if (status_ == ConnectionStatus::DISCONNECTING)
     {
         Release();
     }
-    if(out_buffer_->Size() == 0)
+    if (out_buffer_->Size() == 0)
     {
         channel_->UnWriteAble();
     }

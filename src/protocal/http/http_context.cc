@@ -6,9 +6,9 @@
 
 bool HttpContext::ParseLine(const std::string& line)
 {
-    // 解析请求头
+    // 解析请求行，regex 只编译一次
+    static const std::regex e("(GET|HEAD|POST|PUT|DELETE) ([^?]*)(?:\\?(.*))? (HTTP/1\\.[01])(?:\n|\r\n)?", std::regex::icase);
     std::smatch matches;
-    std::regex e("(GET|HEAD|POST|PUT|DELETE) ([^?]*)(?:\\?(.*))? (HTTP/1\\.[01])(?:\n|\r\n)?", std::regex::icase);
     bool ret = std::regex_match(line , matches , e);
     if(!ret)
     {
@@ -152,6 +152,6 @@ void HttpContext::Parse(std::shared_ptr<Buffer> buf)
         case ContextStatus::PARSEHEADER:
             HandleHeader(buf);
         case ContextStatus::PARSEBODY:
-            HandleBody(buf);  
+            HandleBody(buf);
     }
 }
