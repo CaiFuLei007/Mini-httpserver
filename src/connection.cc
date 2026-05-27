@@ -44,7 +44,7 @@ void Connection::ConnReadCallback()
         status_ = ConnectionStatus::DISCONNECTING;
         if(in_buffer_->Size() > 0)
         {
-            read_callback_(shared_from_this() , in_buffer_);
+            message_callback_(shared_from_this() , in_buffer_);
             channel_->WriteAble();
         }
         else
@@ -55,9 +55,9 @@ void Connection::ConnReadCallback()
     }
     in_buffer_->WriteAndPush(buf);
 
-    if(read_callback_)
+    if(message_callback_)
     {
-        read_callback_(shared_from_this() , in_buffer_);
+        message_callback_(shared_from_this() , in_buffer_);
         channel_->WriteAble();
         return ;
     }
@@ -103,6 +103,10 @@ void Connection::ConnEventCallback()
     if(is_selfrelease_)
     {
         eventloop_->UpdateTimedJob(conn_id_);
+    }
+    if(event_callback_)
+    {
+        event_callback_(shared_from_this());
     }
 }
 
@@ -159,5 +163,7 @@ void Connection::ReadyInLoop()
 
 void Connection::Ready()
 {
+    if(newconnect_callback_)
+        newconnect_callback_(shared_from_this());
     eventloop_->RunInLoop(std::bind(&Connection::ReadyInLoop , this));
 }

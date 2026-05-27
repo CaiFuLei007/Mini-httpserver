@@ -40,9 +40,8 @@ enum class ConnectionStatus
 
 class Connection : public std::enable_shared_from_this<Connection>
 {
-    using ReadCallback = std::function<void(std::shared_ptr<Connection> , std::shared_ptr<Buffer> buf)>;
-    using WriteCallback = std::function<void(std::shared_ptr<Connection> )>;
-    using ErrorCallback = std::function<void(std::shared_ptr<Connection> )>;
+    using MessageCallback = std::function<void(std::shared_ptr<Connection> , std::shared_ptr<Buffer> buf)>;
+    using NewConnectCallback = std::function<void(std::shared_ptr<Connection> )>;
     using EventCallback = std::function<void(std::shared_ptr<Connection> )>;
     using CloseCallback = std::function<void(std::shared_ptr<Connection> )>;
     using SrvCloseCallback = std::function<void(std::shared_ptr<Connection> )>;
@@ -51,9 +50,8 @@ private:
     std::shared_ptr<EventLoop> eventloop_;
     std::shared_ptr<Channel> channel_;
     
-    ReadCallback read_callback_;
-    WriteCallback write_callback_;
-    ErrorCallback error_callback_;
+    MessageCallback message_callback_;
+    NewConnectCallback newconnect_callback_;
     EventCallback event_callback_;
     CloseCallback close_callback_;
     SrvCloseCallback svr_close_callback_;
@@ -88,17 +86,13 @@ public:
         return conn_id_;
     }
 
-    void SetReadCallback(ReadCallback cb)
+    void SetMessageCallback(MessageCallback cb)
     {   
-        read_callback_ = cb;
+        message_callback_ = cb;
     }
-    void SetWriteCallback(WriteCallback cb)
+    void SetNewConnectCallback(NewConnectCallback cb)
     {   
-        write_callback_ = cb;
-    }
-    void SetErrorCallback(ErrorCallback cb)
-    {   
-        error_callback_ = cb;
+        newconnect_callback_ = cb;
     }
     void SetEventCallback(EventCallback cb)
     {   

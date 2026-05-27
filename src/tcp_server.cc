@@ -21,9 +21,8 @@ void TcpServer::AcceptCallback(int fd)
         next_loop = threadpoll_.NextEventLoop();
     }
     auto new_conn = std::make_shared<Connection>(next_id_ , next_loop , fd);
-    new_conn->SetReadCallback(read_callback_);
-    new_conn->SetWriteCallback(write_callback_);
-    new_conn->SetErrorCallback(error_callback_);
+    new_conn->SetMessageCallback(message_callback_);
+    new_conn->SetNewConnectCallback(newconnect_callback_);
     new_conn->SetEventCallback(event_callback_);
     new_conn->SetCloseCallback(close_callback_);
     new_conn->SetSvrCloseCallback(std::bind(&TcpServer::CloseConnection , this , std::placeholders::_1));
