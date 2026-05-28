@@ -81,20 +81,20 @@ void Connection::ConnWriteCallback()
     // 连接写事件的回调
     // 1. 将数据从缓冲区中发送出去
     std::string buf;
-    out_buffer_->ReadAndPop(buf);
+    out_buffer_->Read(buf);
     int ret = socket_.SendNoBlock(buf);
     if(ret < 0)
     {
         if(errno == EAGAIN || errno == EINTR)
         {
-            // 数据未发出，放回缓冲区等待下次可写
-            out_buffer_->WriteAndPush(buf);
             return ;
         }
         status_ = ConnectionStatus::WILLDISCONNECT;
         // 将发送缓冲区清空 , 调用 release 销毁连接
         out_buffer_->Clear();
     }
+    if(ret > 0)
+        out_buffer_->MoveReadAddr(ret);
     if(status_ == ConnectionStatus::WILLDISCONNECT)
     {
         Release();
