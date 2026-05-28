@@ -369,18 +369,19 @@ TEST(SocketTest, Connect_InvalidAddress_Fails)
     EXPECT_FALSE(client.Connect(port, "127.0.0.1"));
 }
 
-TEST(SocketTest, Bind_AlreadyInUse_Fails)
+TEST(SocketTest, Bind_AlreadyInUse_SucceedsWithReusePort)
 {
     uint16_t port = GetFreePort();
 
     Socket s1;
     ASSERT_TRUE(s1.CreateServer(port, "127.0.0.1"));
 
-    // Try to bind another socket to the same port
+    // SO_REUSEPORT allows multiple sockets to bind to the same port
     Socket s2;
-    EXPECT_FALSE(s2.CreateServer(port, "127.0.0.1"));
+    EXPECT_TRUE(s2.CreateServer(port, "127.0.0.1"));
 
     close(s1.Fd());
+    close(s2.Fd());
 }
 
 // ============================================================
@@ -395,14 +396,12 @@ TEST(SocketTest, Connect_Standalone)
     ASSERT_TRUE(server.CreateServer(port, "127.0.0.1"));
 
     Socket client;
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    ASSERT_GE(fd, 0);
-    client = Socket(fd);
+    ASSERT_TRUE(client.CreateClient(port, "127.0.0.1"));
 
-    EXPECT_TRUE(client.Connect(port, "127.0.0.1"));
+    EXPECT_GE(client.Fd(), 0);
 
     close(server.Fd());
-    close(fd);
+    close(client.Fd());
 }
 
 // ============================================================

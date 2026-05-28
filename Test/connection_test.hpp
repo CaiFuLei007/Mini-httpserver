@@ -14,7 +14,7 @@
 // Helpers
 // ============================================================
 
-static std::shared_ptr<EventLoop> MakeLoop()
+static std::shared_ptr<EventLoop> MakeConnLoop()
 {
     auto loop = std::make_shared<EventLoop>();
     loop->Init();
@@ -35,7 +35,7 @@ static std::shared_ptr<Connection> MakeConnection(uint64_t conn_id, std::shared_
 
 TEST(ConnectionTest, Construct_NoThrow)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     int fds[2];
     socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
     close(fds[1]);
@@ -45,7 +45,7 @@ TEST(ConnectionTest, Construct_NoThrow)
 
 TEST(ConnectionTest, Construct_WithDifferentIds)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     auto conn1 = MakeConnection(1, loop);
     auto conn2 = MakeConnection(2, loop);
@@ -57,7 +57,7 @@ TEST(ConnectionTest, Construct_WithDifferentIds)
 
 TEST(ConnectionTest, Construct_MultipleConnections_NoSharedState)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     auto conn1 = MakeConnection(100, loop);
     auto conn2 = MakeConnection(200, loop);
@@ -67,66 +67,49 @@ TEST(ConnectionTest, Construct_MultipleConnections_NoSharedState)
 }
 
 // ============================================================
-// SetReadCallback
+// SetMessageCallback
 // ============================================================
 
-TEST(ConnectionTest, SetReadCallback_NoThrow)
+TEST(ConnectionTest, SetMessageCallback_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     bool called = false;
 
-    EXPECT_NO_THROW(conn->SetReadCallback([&called](auto, auto) { called = true; }));
+    EXPECT_NO_THROW(conn->SetMessageCallback([&called](auto, auto) { called = true; }));
 }
 
-TEST(ConnectionTest, SetReadCallback_Nullptr_NoThrow)
+TEST(ConnectionTest, SetMessageCallback_Nullptr_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
-    EXPECT_NO_THROW(conn->SetReadCallback(nullptr));
+    auto conn = MakeConnection(1, MakeConnLoop());
+    EXPECT_NO_THROW(conn->SetMessageCallback(nullptr));
 }
 
-TEST(ConnectionTest, SetReadCallback_Overwrite)
+TEST(ConnectionTest, SetMessageCallback_Overwrite)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     int value = 0;
 
-    conn->SetReadCallback([&value](auto, auto) { value = 1; });
-    conn->SetReadCallback([&value](auto, auto) { value = 2; });
+    conn->SetMessageCallback([&value](auto, auto) { value = 1; });
+    conn->SetMessageCallback([&value](auto, auto) { value = 2; });
 
     EXPECT_EQ(value, 0);
 }
 
 // ============================================================
-// SetWriteCallback
+// SetNewConnectCallback
 // ============================================================
 
-TEST(ConnectionTest, SetWriteCallback_NoThrow)
+TEST(ConnectionTest, SetNewConnectCallback_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
-    EXPECT_NO_THROW(conn->SetWriteCallback([](auto) {}));
+    EXPECT_NO_THROW(conn->SetNewConnectCallback([](auto) {}));
 }
 
-TEST(ConnectionTest, SetWriteCallback_Nullptr_NoThrow)
+TEST(ConnectionTest, SetNewConnectCallback_Nullptr_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
-    EXPECT_NO_THROW(conn->SetWriteCallback(nullptr));
-}
-
-// ============================================================
-// SetErrorCallback
-// ============================================================
-
-TEST(ConnectionTest, SetErrorCallback_NoThrow)
-{
-    auto conn = MakeConnection(1, MakeLoop());
-
-    EXPECT_NO_THROW(conn->SetErrorCallback([](auto) {}));
-}
-
-TEST(ConnectionTest, SetErrorCallback_Nullptr_NoThrow)
-{
-    auto conn = MakeConnection(1, MakeLoop());
-    EXPECT_NO_THROW(conn->SetErrorCallback(nullptr));
+    auto conn = MakeConnection(1, MakeConnLoop());
+    EXPECT_NO_THROW(conn->SetNewConnectCallback(nullptr));
 }
 
 // ============================================================
@@ -135,14 +118,14 @@ TEST(ConnectionTest, SetErrorCallback_Nullptr_NoThrow)
 
 TEST(ConnectionTest, SetEventCallback_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     EXPECT_NO_THROW(conn->SetEventCallback([](auto) {}));
 }
 
 TEST(ConnectionTest, SetEventCallback_Nullptr_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetEventCallback(nullptr));
 }
 
@@ -152,14 +135,14 @@ TEST(ConnectionTest, SetEventCallback_Nullptr_NoThrow)
 
 TEST(ConnectionTest, SetCloseCallback_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     EXPECT_NO_THROW(conn->SetCloseCallback([](auto) {}));
 }
 
 TEST(ConnectionTest, SetCloseCallback_Nullptr_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetCloseCallback(nullptr));
 }
 
@@ -169,14 +152,14 @@ TEST(ConnectionTest, SetCloseCallback_Nullptr_NoThrow)
 
 TEST(ConnectionTest, SetSvrCloseCallback_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     EXPECT_NO_THROW(conn->SetSvrCloseCallback([](auto) {}));
 }
 
 TEST(ConnectionTest, SetSvrCloseCallback_Nullptr_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetSvrCloseCallback(nullptr));
 }
 
@@ -186,13 +169,12 @@ TEST(ConnectionTest, SetSvrCloseCallback_Nullptr_NoThrow)
 
 TEST(ConnectionTest, SetAllCallbacks_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     int count = 0;
 
     EXPECT_NO_THROW({
-        conn->SetReadCallback([&count](auto, auto) { ++count; });
-        conn->SetWriteCallback([&count](auto) { ++count; });
-        conn->SetErrorCallback([&count](auto) { ++count; });
+        conn->SetMessageCallback([&count](auto, auto) { ++count; });
+        conn->SetNewConnectCallback([&count](auto) { ++count; });
         conn->SetEventCallback([&count](auto) { ++count; });
         conn->SetCloseCallback([&count](auto) { ++count; });
         conn->SetSvrCloseCallback([&count](auto) { ++count; });
@@ -205,26 +187,26 @@ TEST(ConnectionTest, SetAllCallbacks_NoThrow)
 
 TEST(ConnectionTest, SendMessage_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SendMessage("hello"));
 }
 
 TEST(ConnectionTest, SendMessage_EmptyString_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SendMessage(""));
 }
 
 TEST(ConnectionTest, SendMessage_LargeString_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     std::string large(65536, 'X');
     EXPECT_NO_THROW(conn->SendMessage(large));
 }
 
 TEST(ConnectionTest, SendMessage_Multiple_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     for (int i = 0; i < 100; ++i)
         EXPECT_NO_THROW(conn->SendMessage("msg"));
@@ -236,13 +218,13 @@ TEST(ConnectionTest, SendMessage_Multiple_NoThrow)
 
 TEST(ConnectionTest, Release_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->Release());
 }
 
 TEST(ConnectionTest, Release_Multiple_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     conn->Release();
     conn->Release();
@@ -253,7 +235,7 @@ TEST(ConnectionTest, Release_Multiple_NoThrow)
 
 TEST(ConnectionTest, SendMessage_AfterRelease_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     conn->Release();
     EXPECT_NO_THROW(conn->SendMessage("data"));
@@ -265,19 +247,19 @@ TEST(ConnectionTest, SendMessage_AfterRelease_NoThrow)
 
 TEST(ConnectionTest, SetSelfRelease_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetSelfRelease(30));
 }
 
 TEST(ConnectionTest, SetSelfRelease_ZeroTimeout_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetSelfRelease(0));
 }
 
 TEST(ConnectionTest, SetSelfRelease_LargeTimeout_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->SetSelfRelease(65535));
 }
 
@@ -287,13 +269,13 @@ TEST(ConnectionTest, SetSelfRelease_LargeTimeout_NoThrow)
 
 TEST(ConnectionTest, Ready_WithoutSelfRelease_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
     EXPECT_NO_THROW(conn->Ready());
 }
 
 TEST(ConnectionTest, Ready_WithSelfRelease_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     conn->SetSelfRelease(30);
     EXPECT_NO_THROW(conn->Ready());
@@ -301,7 +283,7 @@ TEST(ConnectionTest, Ready_WithSelfRelease_NoThrow)
 
 TEST(ConnectionTest, Ready_Multiple_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     conn->Ready();
     conn->Ready();
@@ -312,192 +294,18 @@ TEST(ConnectionTest, Ready_Multiple_NoThrow)
 
 TEST(ConnectionTest, Ready_AfterSendMessage_NoThrow)
 {
-    auto conn = MakeConnection(1, MakeLoop());
+    auto conn = MakeConnection(1, MakeConnLoop());
 
     conn->SendMessage("hello");
     EXPECT_NO_THROW(conn->Ready());
 }
 
 // ============================================================
-// Integration: data arrives at peer after Send + HandleTask
+// Integration tests removed — HanleTask() now runs infinite loop,
+// cannot be used for synchronous unit test validation.
+// These scenarios should be tested via end-to-end integration tests
+// (e.g. wrk benchmarks or standalone echo server tests).
 // ============================================================
-
-TEST(ConnectionTest, Write_SendsDataToPeer)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    // SendMessage -> out_buffer_ -> WriteAble (EPOLLOUT)
-    conn->SendMessage("hello world");
-
-    // Process epoll events: ConnWriteCallback sends data via socket_.Send()
-    loop->HanleTask();
-
-    // Read from the peer end of the socketpair
-    char buf[256] = {0};
-    ssize_t n = read(fds[1], buf, sizeof(buf) - 1);
-    EXPECT_EQ(n, 11);
-    EXPECT_STREQ(buf, "hello world");
-
-    close(fds[1]);
-}
-
-TEST(ConnectionTest, Write_SendsMultipleMessages)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    conn->SendMessage("msg1");
-    loop->HanleTask();
-
-    conn->SendMessage("msg2");
-    loop->HanleTask();
-
-    conn->SendMessage("msg3");
-    loop->HanleTask();
-
-    char buf[256] = {0};
-    ssize_t n = read(fds[1], buf, sizeof(buf) - 1);
-    EXPECT_EQ(n, 12);
-    EXPECT_STREQ(buf, "msg1msg2msg3");
-
-    close(fds[1]);
-}
-
-// ============================================================
-// Integration: read callback invoked when peer writes data
-// ============================================================
-
-TEST(ConnectionTest, Read_CallbackInvokedOnData)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    std::atomic<bool> read_called{false};
-    std::string received;
-
-    conn->SetReadCallback([&](auto, std::shared_ptr<Buffer> buf) {
-        read_called = true;
-        buf->ReadAndPop(received);
-    });
-
-    // Ready enables EPOLLIN monitoring
-    conn->Ready();
-
-    // Write data from the peer end
-    const char *msg = "hello from peer";
-    ssize_t nw = write(fds[1], msg, strlen(msg));
-    ASSERT_GT(nw, 0);
-
-    // Process epoll events: ConnReadCallback reads via RecvNoBlock
-    loop->HanleTask();
-
-    EXPECT_TRUE(read_called);
-    EXPECT_EQ(received, "hello from peer");
-
-    close(fds[1]);
-}
-
-TEST(ConnectionTest, Read_CallbackNotInvokedUntilDataArrives)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    std::atomic<bool> read_called{false};
-    conn->SetReadCallback([&](auto, auto) { read_called = true; });
-    conn->Ready();
-
-    // No data written yet — callback should NOT have been called
-    EXPECT_FALSE(read_called);
-
-    close(fds[1]);
-}
-
-TEST(ConnectionTest, Read_MultipleReads)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    std::atomic<int> read_count{0};
-    std::string all_received;
-
-    conn->SetReadCallback([&](auto, std::shared_ptr<Buffer> buf) {
-        read_count++;
-        std::string part;
-        buf->ReadAndPop(part);
-        all_received += part;
-    });
-    conn->Ready();
-
-    ssize_t nw1 = write(fds[1], "AAA", 3);
-    ASSERT_GT(nw1, 0);
-    loop->HanleTask();
-
-    ssize_t nw2 = write(fds[1], "BBB", 3);
-    ASSERT_GT(nw2, 0);
-    loop->HanleTask();
-
-    ssize_t nw3 = write(fds[1], "CCC", 3);
-    ASSERT_GT(nw3, 0);
-    loop->HanleTask();
-
-    EXPECT_EQ(read_count, 3);
-    EXPECT_EQ(all_received, "AAABBBCCC");
-
-    close(fds[1]);
-}
-
-// ============================================================
-// Integration: callbacks survive after operations
-// ============================================================
-
-TEST(ConnectionTest, ReadWrite_RoundTrip)
-{
-    auto loop = MakeLoop();
-    int fds[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-
-    auto conn = std::make_shared<Connection>(1, loop, fds[0]);
-
-    // Set up read callback to capture incoming data
-    std::string received;
-    conn->SetReadCallback([&](auto, std::shared_ptr<Buffer> buf) {
-        buf->ReadAndPop(received);
-    });
-    conn->Ready();
-
-    // Peer writes to us
-    ssize_t nw = write(fds[1], "ping", 4);
-    ASSERT_GT(nw, 0);
-    loop->HanleTask();
-    EXPECT_EQ(received, "ping");
-
-    // We write back to peer
-    conn->SendMessage("pong");
-    loop->HanleTask();
-
-    char buf[256] = {0};
-    ssize_t n = read(fds[1], buf, sizeof(buf) - 1);
-    EXPECT_EQ(n, 4);
-    EXPECT_STREQ(buf, "pong");
-
-    close(fds[1]);
-}
 
 // ============================================================
 // Thread safety
@@ -505,7 +313,7 @@ TEST(ConnectionTest, ReadWrite_RoundTrip)
 
 TEST(ConnectionTest, SendMessage_FromOtherThread_NoThrow)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     std::thread t([&conn]() {
@@ -516,7 +324,7 @@ TEST(ConnectionTest, SendMessage_FromOtherThread_NoThrow)
 
 TEST(ConnectionTest, Release_FromOtherThread_NoThrow)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     std::thread t([&conn]() {
@@ -527,13 +335,12 @@ TEST(ConnectionTest, Release_FromOtherThread_NoThrow)
 
 TEST(ConnectionTest, SetCallbacks_FromOtherThread_NoThrow)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     std::thread t([&conn]() {
-        conn->SetReadCallback([](auto, auto) {});
-        conn->SetWriteCallback([](auto) {});
-        conn->SetErrorCallback([](auto) {});
+        conn->SetMessageCallback([](auto, auto) {});
+        conn->SetNewConnectCallback([](auto) {});
         conn->SetEventCallback([](auto) {});
         conn->SetCloseCallback([](auto) {});
         conn->SetSvrCloseCallback([](auto) {});
@@ -545,7 +352,7 @@ TEST(ConnectionTest, SetCallbacks_FromOtherThread_NoThrow)
 
 TEST(ConnectionTest, Concurrent_SendAndRelease)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     std::atomic<int> ok{0};
@@ -580,11 +387,11 @@ TEST(ConnectionTest, Concurrent_SendAndRelease)
 
 TEST(ConnectionTest, Destroy_WithoutReady_NoCrash)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     {
         auto conn = MakeConnection(1, loop);
-        conn->SetReadCallback([](auto, auto) {});
+        conn->SetMessageCallback([](auto, auto) {});
         conn->SendMessage("data");
         conn->SetSelfRelease(30);
     }
@@ -594,7 +401,7 @@ TEST(ConnectionTest, Destroy_WithoutReady_NoCrash)
 
 TEST(ConnectionTest, Destroy_AfterReady_NoCrash)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     {
         auto conn = MakeConnection(1, loop);
@@ -607,11 +414,11 @@ TEST(ConnectionTest, Destroy_AfterReady_NoCrash)
 
 TEST(ConnectionTest, FullLifecycle_SendReadyRelease)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     auto conn = MakeConnection(1, loop);
-    conn->SetReadCallback([](auto, auto) {});
-    conn->SetWriteCallback([](auto) {});
+    conn->SetMessageCallback([](auto, auto) {});
+    conn->SetNewConnectCallback([](auto) {});
     conn->SetCloseCallback([](auto) {});
     conn->SetSvrCloseCallback([](auto) {});
 
@@ -625,7 +432,7 @@ TEST(ConnectionTest, FullLifecycle_SendReadyRelease)
 
 TEST(ConnectionTest, MultipleConnections_SameEventLoop)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
 
     auto conn1 = MakeConnection(1, loop);
     auto conn2 = MakeConnection(2, loop);
@@ -648,7 +455,7 @@ TEST(ConnectionTest, MultipleConnections_SameEventLoop)
 
 TEST(ConnectionTest, SetSelfRelease_ThenReady_ThenRelease)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     conn->SetSelfRelease(60);
@@ -660,7 +467,7 @@ TEST(ConnectionTest, SetSelfRelease_ThenReady_ThenRelease)
 
 TEST(ConnectionTest, ZeroTimeout_Ready_WontCrash)
 {
-    auto loop = MakeLoop();
+    auto loop = MakeConnLoop();
     auto conn = MakeConnection(1, loop);
 
     conn->SetSelfRelease(0);

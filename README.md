@@ -6,36 +6,9 @@
 **编程语言**：C++20  
 **构建工具**：CMake 3.18+
 
-## 测试环境
+## 项目简介
 
-| 项目 | 规格 |
-|------|------|
-| CPU | AMD Ryzen 7 6800H (8C8T) @ 3.2GHz |
-| 内存 | 8 GB DDR5 |
-| 操作系统 | Ubuntu 22.04.5 LTS |
-| 内核 | Linux 6.8.0-111-generic |
-| 编译器 | g++ 11.4.0 |
-| 构建工具 | CMake 3.22.1 |
-| 第三方库 | quill（异步日志）、Google Test 1.16.0 |
-
-## 如何复现
-
-```bash
-git clone <repo-url>
-cd Mini-httpserver
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-
-# Echo 服务（端口 8888）
-./bin/release/echo_server
-
-# HTTP 服务（端口 8080），第二个参数指定静态文件目录
-./bin/release/http_server_test ../web
-
-# 单元测试
-./bin/release/all_test
-```
+基于 C++20 开发的轻量级 HTTP 服务器，参考陈硕 [muduo](https://github.com/chenshuo/muduo) 网络库的 Reactor 架构，使用 C++ 标准库替代 Boost 依赖，集成 [quill](https://github.com/odygrd/quill) 异步日志库。支持 GET/POST/PUT/DELETE 路由、静态文件服务、HTTP keep-alive 长连接，单机 QPS 可达 6 万。
 
 ## 代码统计
 
@@ -46,17 +19,6 @@ make -j$(nproc)
 | 单元测试 | 3,266 行（部分测试用例由 AI 辅助编写） |
 | 源文件数 | 46（含测试） |
 | 测试覆盖模块 | Buffer, Socket, Poller, TimerWheel, EventLoop, Connection, Utils |
-
-## 已知缺陷
-
-
-- **单 Acceptor 瓶颈**：单 listener 在极端短连接场景（>5 万 accept/s）可能成为瓶颈，多核下可改用 `SO_REUSEPORT` + 多 Acceptor
-- **`_next_id` 共用计数器**：连接 ID 和定时任务 ID 共用 `TcpServer::next_id_`，使用起来并没有影响，但语义不清，后续扩展时容易踩坑
-- **时间轮精度粗**：1s tick，不适用于毫秒级超时
-- **HTTP 解析不完整**：不支持 chunked 编码、Trailer 头、`Expect: 100-continue`、多部分表单上传
-- **无背压机制**：输出缓冲区无上限，慢客户端可撑爆服务端内存
-- **无安全机制**：无 TLS、无连接数限制、无请求速率限制
-
 
 ## 项目编译
 
@@ -87,6 +49,19 @@ make -j$(nproc)
 # Ubuntu 安装 GTest
 sudo apt install libgtest-dev
 ```
+
+## 测试环境
+
+| 项目 | 规格 |
+|------|------|
+| CPU | Intel Xeon Platinum (2C4T) @ 2.5GHz |
+| 内存 | 1.6 GB |
+| 磁盘 | 40 GB SSD |
+| 操作系统 | Ubuntu 22.04 LTS |
+| 内核 | Linux 5.15.0-142-generic |
+| 编译器 | g++ 11.4.0 |
+| 构建工具 | CMake 3.22.1 |
+| 第三方库 | quill（异步日志）、Google Test 1.16.0 |
 
 ## 项目测试
 
@@ -171,22 +146,30 @@ cd wrk && make -j$(nproc) && sudo cp wrk /usr/local/bin/
 wrk -t4 -c1000 -d30s --latency http://localhost:8080/hello
 ```
 
-**测试环境**：AMD Ryzen 7 6800H (8C8T)、8GB DDR5、Ubuntu 22.04、g++ 11.4.0 Release
-
 **目标接口**：`GET /hello`，响应体 `{"message": "Hello, World!"}`（28 bytes）
 
-### localhost 单机 wrk 压测（WARN 日志级别，ThreadCount=3）
+### localhost 单机压测（WARN 日志级别，ThreadCount=3）
+
+| 场景 | 工具 | QPS | P50 | P99 | 带宽 |
+|------|------|-----|-----|-----|------|
+| c1000 keep-alive | wrk -t4 | **60,827** | 16.24ms | 29.69ms | 7.14 MB/s |
+| c5000 keep-alive | wrk -t4 | 60,087 | 82.32ms | 122.49ms | 7.05 MB/s |
+| c10000 keep-alive | wrk -t4 | 56,472 | 165.59ms | 263.04ms | 6.62 MB/s |
+| c15000 keep-alive | wrk -t4 | 49,879 | 293.39ms | 460.67ms | 5.85 MB/s |
+| c20000 keep-alive | wrk -t4 | 45,566 | 419.34ms | 604.47ms | 5.35 MB/s |
+| c25000 keep-alive | wrk -t4 | 43,881 | 552.49ms | 805.41ms | 5.15 MB/s |
+| c30000 keep-alive | wrk -t4 | 41,561 | 702.16ms | 913.59ms | 4.88 MB/s |
+
+### 公网跨机器压测（本地 → 云服务器）
 
 | 场景 | 工具 | QPS | P50 | P99 | 带宽 | 说明 |
 |------|------|-----|-----|-----|------|------|
-| c500 keep-alive | wrk -t4 | 38,715 | 12.76ms | 18.29ms | 4.54 MB/s | 延迟低 |
-| c1000 keep-alive | wrk -t4 | 37,611 | 26.44ms | 29.90ms | 4.41 MB/s | |
-| c5000 keep-alive | wrk -t4 | 37,110 | 133.27ms | 145.55ms | 4.35 MB/s | |
-| c10000 keep-alive | wrk -t4 | 37,635 | 261.74ms | 287.64ms | 4.41 MB/s | |
-| c15000 keep-alive | wrk -t4 | 38,529 | 377.65ms | 420.38ms | 4.52 MB/s | |
-| c20000 keep-alive | wrk -t4 | 39,075 | 497.57ms | 545.42ms | 4.58 MB/s | |
-| c25000 keep-alive | wrk -t4 | 38,576 | 618.93ms | 700.13ms | 4.53 MB/s | |
-| c30000 keep-alive | wrk -t4 | **43,162** | 663.66ms | 856.49ms | 5.06 MB/s | **峰值 QPS** |
+| c5000 keep-alive | wrk -t4 | 5,109 | 306.56ms | 1.85s | 614 KB/s | 7,787 timeout，公网带宽瓶颈 |
+
+**关键结论：**
+- QPS 峰值 **6 万**（c1000），连接数从 1000 到 3 万 QPS 从 6 万逐步降至 4.2 万，仅降 31%
+- P50 延迟与连接数线性相关：c1000 仅 16ms，c30000 达 702ms
+- 公网跨机器 QPS 仅 5,109，受限于公网带宽和延迟，非服务端瓶颈
 
 **关键结论：**
 - QPS 极其稳定，从 500 到 3 万连接始终维持在 **3.7-4.3 万**，吞吐几乎不受连接数影响
@@ -209,6 +192,15 @@ wrk -t4 -c1000 -d30s --latency http://localhost:8080/hello
 - **高并发预测**：1 万长连接 ≈ **19MB**；5 万长连接 ≈ **79MB**
 
 ---
+
+## 已知缺陷
+
+- **单 Acceptor 瓶颈**：单 listener 在极端短连接场景（>5 万 accept/s）可能成为瓶颈，多核下可改用 `SO_REUSEPORT` + 多 Acceptor
+- **`_next_id` 共用计数器**：连接 ID 和定时任务 ID 共用 `TcpServer::next_id_`，语义不清，后续扩展时容易踩坑
+- **时间轮精度粗**：1s tick，不适用于毫秒级超时
+- **HTTP 解析不完整**：不支持 chunked 编码、Trailer 头、`Expect: 100-continue`、多部分表单上传
+- **无背压机制**：输出缓冲区无上限，慢客户端可撑爆服务端内存
+- **无安全机制**：无 TLS、无连接数限制、无请求速率限制
 
 ## 项目概述
 

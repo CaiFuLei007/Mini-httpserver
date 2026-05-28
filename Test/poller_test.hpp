@@ -6,6 +6,7 @@
 
 #include "base/poller.h"
 #include "base/channel.h"
+#include "server/eventloop.h"
 
 class PollerTest : public ::testing::Test
 {
@@ -14,6 +15,8 @@ protected:
     {
         poller_ = std::make_unique<Poller>();
         ASSERT_GT(poller_->Fd(), 0);
+        loop_ = std::make_shared<EventLoop>();
+        loop_->Init();
     }
 
     void TearDown() override
@@ -21,11 +24,11 @@ protected:
         poller_.reset();
     }
 
-    static std::shared_ptr<Channel> MakeEventChannel()
+    std::shared_ptr<Channel> MakeEventChannel()
     {
         int fd = eventfd(0, EFD_NONBLOCK);
         EXPECT_GT(fd, 0);
-        return std::make_shared<Channel>(fd);
+        return std::make_shared<Channel>(fd, loop_);
     }
 
     static void TriggerEvent(Channel *channel)
@@ -35,6 +38,7 @@ protected:
     }
 
     std::unique_ptr<Poller> poller_;
+    std::shared_ptr<EventLoop> loop_;
 };
 
 // 构造函数创建有效的 epoll fd

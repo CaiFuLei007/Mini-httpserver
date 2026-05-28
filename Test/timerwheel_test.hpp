@@ -5,6 +5,15 @@
 #include <functional>
 
 #include "server/timerwheel.h"
+#include "server/eventloop.h"
+
+// Helper
+static std::shared_ptr<EventLoop> MakeTimerWheelLoop()
+{
+    auto loop = std::make_shared<EventLoop>();
+    loop->Init();
+    return loop;
+}
 
 // ============================================================
 // TimeTask — Constructor & Initial State
@@ -172,7 +181,8 @@ TEST(TimeTaskTest, Cancel_MixedCancelledAndActive)
 
 TEST(TimerWheelTest, CancelTask_NonExistentId_DoesNotCrash)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     EXPECT_NO_THROW(tw.CancelTask(999));
 }
 
@@ -182,7 +192,8 @@ TEST(TimerWheelTest, CancelTask_NonExistentId_DoesNotCrash)
 
 TEST(TimerWheelTest, UpdateTask_NonExistentId_DoesNotCrash)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     EXPECT_NO_THROW(tw.UpdateTask(999));
 }
 
@@ -192,7 +203,8 @@ TEST(TimerWheelTest, UpdateTask_NonExistentId_DoesNotCrash)
 
 TEST(TimerWheelTest, SetTaskAndCancel_TaskDoesNotExecute)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     bool called = false;
 
     tw.SetTask(1, 1, [&called]() { called = true; });
@@ -208,7 +220,8 @@ TEST(TimerWheelTest, SetTaskAndCancel_TaskDoesNotExecute)
 
 TEST(TimerWheelTest, SetTask_WithTimeout_StoresWithoutExecuting)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     bool called = false;
 
     tw.SetTask(42, 10, [&called]() { called = true; });
@@ -225,7 +238,8 @@ TEST(TimerWheelTest, SetTask_WithTimeout_StoresWithoutExecuting)
 
 TEST(TimerWheelTest, SetMultipleTasks_CancelSome)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     bool a = false, b = false, c = false;
 
     tw.SetTask(1, 5, [&a]() { a = true; });
@@ -245,7 +259,8 @@ TEST(TimerWheelTest, SetMultipleTasks_CancelSome)
 
 TEST(TimerWheelTest, UpdateTask_ExistingTask_DoesNotCrash)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
 
     tw.SetTask(1, 5, []() {});
     EXPECT_NO_THROW(tw.UpdateTask(1));
@@ -257,7 +272,8 @@ TEST(TimerWheelTest, UpdateTask_ExistingTask_DoesNotCrash)
 
 TEST(TimerWheelTest, CancelTask_TwiceOnSameId)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     tw.SetTask(1, 5, []() {});
 
     tw.CancelTask(1);
@@ -270,7 +286,8 @@ TEST(TimerWheelTest, CancelTask_TwiceOnSameId)
 
 TEST(TimerWheelTest, CancelThenUpdate)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     tw.SetTask(1, 5, []() {});
 
     tw.CancelTask(1);
@@ -284,7 +301,8 @@ TEST(TimerWheelTest, CancelThenUpdate)
 
 TEST(TimerWheelTest, SetTask_SameIdTwice_SecondOverwrites)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     bool first = false, second = false;
 
     tw.SetTask(1, 5, [&first]() { first = true; });
@@ -304,6 +322,7 @@ TEST(TimerWheelTest, SetTask_SameIdTwice_SecondOverwrites)
 
 TEST(TimerWheelTest, Ready_DoesNotCrash)
 {
-    TimerWheel tw;
+    auto loop = MakeTimerWheelLoop();
+    TimerWheel tw(loop);
     EXPECT_NO_THROW(tw.Ready());
 }

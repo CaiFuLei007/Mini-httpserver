@@ -1,5 +1,7 @@
 
 
+#pragma once
+
 /*
     - 基于时间轮的定时器
     - 分为两个部分进行实现 : TimeTask , TimerWheel
@@ -84,9 +86,9 @@ class TimerWheel
 {
     using Task = std::function<void()>;
 private:
+    std::unordered_map<size_t , std::weak_ptr<TimeTask> > tasks_;
     std::vector<std::vector<std::shared_ptr<TimeTask> > > wheel_;
     size_t tick_;
-    std::unordered_map<size_t , std::weak_ptr<TimeTask> > tasks_;
     int timerfd_;
 
     std::weak_ptr<EventLoop> eventloop_;
