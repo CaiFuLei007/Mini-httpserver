@@ -6,6 +6,8 @@
 **编程语言**：C++20  
 **构建工具**：CMake 3.18+
 
+> :book: **Wiki 文档**：[Mini-httpserver wiki](https://github.com/CaiFuLei007/Mini-httpserver/wiki) — 完整的设计文档与模块详解
+
 ## 目录
 
 - [Mini-httpserver - 轻量级 C++ HTTP 服务器](#mini-httpserver---轻量级-c-http-服务器)
