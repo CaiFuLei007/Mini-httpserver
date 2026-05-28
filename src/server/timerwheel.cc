@@ -48,7 +48,11 @@ channel_(std::make_shared<Channel>(timerfd_ , eventloop))
 
 void TimerWheel::SetTask(size_t id ,size_t timeout , Task task)
 {
-    std::shared_ptr<TimeTask> task_ptr = std::make_shared<TimeTask>(id , timeout , task);
+    std::shared_ptr<TimeTask> task_ptr = std::make_shared<TimeTask>(id , timeout , [this, id, task]()
+    {
+        tasks_.erase(id);
+        task();
+    });
     int index = (tick_ + timeout) % wheel_.size();
     wheel_[index].push_back(task_ptr);
     tasks_.emplace(id , task_ptr);
